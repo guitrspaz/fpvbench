@@ -1,0 +1,39 @@
+# SYNTHETIC EXAMPLE: a tiny parser fixture, not a configuration for flight.
+# dump all
+# Betaflight / STM32F405 (S405) 4.5.1 Jun 12 2024 / 12:00:00 (abcdef12) MSP API: 1.46
+# manufacturer_id: TEST   board_name: SYNTHETICF405
+batch start
+board_name SYNTHETICF405
+manufacturer_id TEST
+feature -GPS
+feature OSD
+serial 0 64 115200 57600 0 115200
+aux 0 0 0 1700 2100 0 0
+map AETR1234
+set craft_name = Example quad
+set gyro_lpf1_static_hz = 250
+set failsafe_procedure = DROP
+profile 0
+set p_roll = 45
+set i_roll = 80
+set d_roll = 30
+set d_min_roll = 23
+profile 1
+set p_roll = 40
+set i_roll = 75
+set d_roll = 27
+rateprofile 0
+set rates_type = ACTUAL
+set roll_rc_rate = 20
+set roll_srate = 70
+set roll_expo = 0
+rateprofile 1
+set rates_type = ACTUAL
+set roll_rc_rate = 15
+set roll_srate = 60
+set roll_expo = 10
+# restore original profile selection
+profile 0
+rateprofile 0
+batch end
+save

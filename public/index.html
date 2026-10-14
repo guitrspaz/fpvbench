@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#141719" />
+    <title>FPVBench · Setup workbench</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="FPVBench home"
+        ><span class="brand-mark" aria-hidden="true">F</span
+        ><span
+          >FPV<span class="brand-light">Bench</span
+          ><small>YOUR FLIGHT WORKBENCH</small></span
+        ></a
+      >
+      <label class="field-label" for="aircraft-select">AIRCRAFT</label>
+      <select id="aircraft-select" aria-label="Selected aircraft">
+        <option value="">Loading…</option>
+      </select>
+      <button id="add-aircraft" class="subtle wide">+ Add aircraft</button>
+      <nav aria-label="Workbench views">
+        <button class="nav-item active" data-view="overview">
+          <span aria-hidden="true">◈</span> Overview
+        </button>
+        <button class="nav-item" data-view="history">
+          <span aria-hidden="true">▤</span> Setup history
+        </button>
+        <button class="nav-item" data-view="compare">
+          <span aria-hidden="true">⇄</span> Compare setups
+        </button>
+        <button class="nav-item" data-view="sessions">
+          <span aria-hidden="true">↗</span> Flight sessions
+        </button>
+      </nav>
+      <div class="sidebar-note">
+        <span class="status-dot"></span> Local workspace
+        <p>Your exports stay on this computer. No controller connection.</p>
+      </div>
+      <a class="export-link" href="/api/export" download>↓ Export workspace</a>
+      <span class="version">FPVBENCH / v0.1</span>
+    </aside>
+    <main>
+      <header class="topbar">
+        <span id="breadcrumb">WORKBENCH / OVERVIEW</span
+        ><span class="local-badge">LOCAL ONLY</span>
+      </header>
+      <div id="notice" role="status" aria-live="polite" hidden></div>
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow" id="page-eyebrow">SETUP. FLY. LEARN.</p>
+          <h1 id="page-title">Your flight workbench</h1>
+          <p id="page-description">
+            A clear record of your setup, and what happened next.
+          </p>
+        </div>
+        <div class="heading-actions">
+          <button id="new-session" class="secondary">+ Log a flight</button
+          ><button id="import-snapshot" class="primary">↑ Import setup</button>
+        </div>
+      </section>
+      <section id="content" aria-label="Workbench content" aria-live="polite">
+        <p class="loading">Loading your workspace…</p>
+      </section>
+      <footer>
+        Saved exports describe a point in time. Confirm your actual aircraft
+        settings before flight.
+      </footer>
+    </main>
+
+    <dialog id="aircraft-dialog" aria-labelledby="aircraft-title">
+      <form id="aircraft-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">YOUR FLEET</p>
+            <h2 id="aircraft-title">Add an aircraft</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button close-dialog"
+            aria-label="Close aircraft dialog"
+          >
+            ×
+          </button>
+        </div>
+        <label
+          >Aircraft name<input
+            name="name"
+            required
+            maxlength="120"
+            placeholder="e.g. Freestyle 5 inch"
+            autocomplete="off"
+        /></label>
+        <label
+          >Type / build<input
+            name="kind"
+            maxlength="120"
+            placeholder="e.g. Betaflight freestyle quad"
+        /></label>
+        <label
+          >Notes<textarea
+            name="notes"
+            rows="3"
+            placeholder="Frame, motors, controller, or anything helpful"
+          ></textarea>
+        </label>
+        <p class="form-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button type="button" class="secondary close-dialog">Cancel</button
+          ><button type="submit" class="primary">Add aircraft</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="import-dialog" aria-labelledby="import-title">
+      <form id="import-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">IMMUTABLE SETUP SNAPSHOT</p>
+            <h2 id="import-title">Import Betaflight setup</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button close-dialog"
+            aria-label="Close import dialog"
+          >
+            ×
+          </button>
+        </div>
+        <p class="form-help">
+          Import a CLI <code>dump all</code> or <code>diff all</code> export.
+          The exact source is preserved; importing never sends commands to your
+          controller.
+        </p>
+        <label
+          >Setup label<input
+            name="label"
+            required
+            maxlength="120"
+            placeholder="e.g. Preferred freestyle setup"
+        /></label>
+        <label class="file-field"
+          >Choose a text export · maximum 1 MiB<input
+            id="import-file"
+            type="file"
+            accept=".txt,.log,.cfg,text/plain"
+        /></label>
+        <label
+          >Or paste the CLI export<textarea
+            name="rawText"
+            rows="8"
+            spellcheck="false"
+            placeholder="# Betaflight …"
+          ></textarea>
+        </label>
+        <label
+          >Notes<textarea
+            name="notes"
+            rows="2"
+            placeholder="What changed? Why save this setup?"
+          ></textarea>
+        </label>
+        <p class="form-help">
+          Trying the workflow? Download explicitly synthetic
+          <a href="/examples/baseline-dump.txt" download>baseline</a> and
+          <a href="/examples/experiment-diff.txt" download>experiment</a>
+          examples.
+        </p>
+        <p class="form-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button type="button" class="secondary close-dialog">Cancel</button
+          ><button type="submit" class="primary">Save snapshot</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="session-dialog" aria-labelledby="session-title">
+      <form id="session-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">FIELD NOTES</p>
+            <h2 id="session-title">Log a flight session</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button close-dialog"
+            aria-label="Close session dialog"
+          >
+            ×
+          </button>
+        </div>
+        <label
+          >Session title<input
+            name="title"
+            required
+            maxlength="120"
+            placeholder="e.g. New props · first test"
+        /></label>
+        <div class="form-grid">
+          <label
+            >Flight date and time<input
+              name="flownAt"
+              type="datetime-local"
+              required /></label
+          ><label
+            >Duration (minutes)<input
+              name="durationMinutes"
+              type="number"
+              min="0"
+              step="0.1"
+          /></label>
+        </div>
+        <label
+          >Setup used<select name="snapshotId">
+            <option value="">No linked snapshot</option>
+          </select></label
+        >
+        <label class="checkbox-label"
+          ><input name="confirmedSetup" type="checkbox" /><span
+            >I checked the aircraft setup for this session.<small
+              >A saved snapshot alone does not confirm what was on the
+              controller.</small
+            ></span
+          ></label
+        >
+        <label
+          >Location<input name="location" placeholder="Field or flying spot"
+        /></label>
+        <div class="form-grid">
+          <label
+            >Battery<input
+              name="battery"
+              placeholder="Pack / capacity / cell count" /></label
+          ><label>Props<input name="props" placeholder="Model / size" /></label>
+        </div>
+        <label
+          >Conditions<input
+            name="conditions"
+            placeholder="Wind, temperature, lighting…"
+        /></label>
+        <label
+          >Compared with your previous setup<select name="outcome">
+            <option value="unrated">Not rated</option>
+            <option value="better">Better</option>
+            <option value="same">About the same</option>
+            <option value="worse">Worse</option>
+          </select></label
+        >
+        <label
+          >Observations<textarea
+            name="notes"
+            rows="3"
+            placeholder="Handling, vibration, flight time, and what to try next"
+          ></textarea>
+        </label>
+        <label
+          >Footage / log references<textarea
+            name="mediaRefs"
+            rows="2"
+            placeholder="One file path, URL, or reference per line"
+          ></textarea
+          ><small class="form-help"
+            >References only; files are not uploaded.</small
+          ></label
+        >
+        <p class="form-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button type="button" class="secondary close-dialog">Cancel</button
+          ><button type="submit" class="primary">Save session</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

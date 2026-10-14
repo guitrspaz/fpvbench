@@ -1,0 +1,15 @@
+node_modules/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+.env
+.env.*
+*.log
+.fpvbench/
+workspace.json
+workspace.json.*
+data/
+.workspace.lock
+.workspace-recovery.lock
+.workspace-*.tmp
