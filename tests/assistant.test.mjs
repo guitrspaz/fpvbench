@@ -2,6 +2,23 @@ import { test, expect, jest } from '@jest/globals';
 import { parseExport } from '../src/parser.mjs';
 import { createAssistant } from '../src/assistant.mjs';
 import { snapshotEvidence, compareEvidence, flightFacts } from '../src/assistant-evidence.mjs';
+import { DISTANCE_BASIS } from '../src/dji-distance.mjs';
+
+test('verified TXT distance is usable and recap units isolate cache and prepared presentation', async () => {
+  const { assistant, ai, state } = harness();
+  state.flightLogs = [{ id: 'verified', aircraftId: 'quad-a', format: 'dji-txt', logVersion: 14, summary: { aircraftModel: 'DJI product type 137', distanceMeters: 1609.344, distanceSourceValue: 1.609344, distanceSourceUnit: 'km', distanceUnitBasis: DISTANCE_BASIS, durationSeconds: 120, startTime: '2026-10-14T12:00:00Z' } }];
+  const metric = await assistant.recapFlights('quad-a');
+  expect(metric.facts.distanceWithheldFlightCount).toBe(0);
+  expect(metric.facts.distanceFlownMeters.value).toBe(1609.34);
+  expect(metric.facts.durationBasis).toMatch(/not independently established airborne/);
+  const imperial = await assistant.recapFlights('quad-a', { units: 'imperial' });
+  expect(imperial.context.units).toBe('imperial');
+  expect(ai.run.mock.calls[1][1].presentation.highlights.find(row => row.label === 'Recorded flown path').value).toBe('5,279.99 ft');
+  expect((await assistant.recapFlights('quad-a', { units: 'imperial' })).cached).toBe(true);
+  expect((await assistant.recapFlights('quad-a')).cached).toBe(true);
+  await expect(assistant.recapFlights('quad-a', { units: 'invalid' })).rejects.toMatchObject({ status: 400 });
+  expect(ai.run).toHaveBeenCalledTimes(2);
+});
 
 const result = { summary: 'Review the explicit changes.', observations: ['Rates affect stick response.'], questions: ['Which response do you prefer?'], limitations: ['Hardware evidence is incomplete.'] };
 function snapshot(id, lines, extra = {}) {
@@ -115,7 +132,7 @@ test('recap facts avoid linked-session duplicates, preserve zero/missing coverag
   state.aircraft[0].status = 'retired';
   const report = await assistant.recapFlights('quad-a');
   expect(report.context.aircraftId).toBe('quad-a');
-  expect(report.context.recapVersion).toBe(2);
+  expect(report.context.recapVersion).toBe(3);
   expect(report.facts.unassignedFlightCount).toBe(0);
   expect(report.facts.flightCount).toBe(3);
   expect(report.facts.durationSeconds).toEqual({ value: 180, coveredFlights: 3, totalFlights: 3 });

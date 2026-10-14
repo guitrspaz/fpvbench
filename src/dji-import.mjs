@@ -1,3 +1,4 @@
+import { DISTANCE_BASIS } from './dji-distance.mjs';
 import { Worker } from 'node:worker_threads';
 import { AppError, assertSafeObject, containsControlText } from './errors.mjs';
 
@@ -68,6 +69,10 @@ export function normalizeDecodedFlight({ version, details, summary, frames }, fo
     location,
     startCoordinate: coordinate(metadata.startCoordinate?.latitude ?? metadata.latitude, metadata.startCoordinate?.longitude ?? metadata.longitude),
   };
+  if (format === 'dji-txt' && version === 14 && metadata.productType === 137 && metadata.distanceMeters == null) {
+    const source = metric(metadata.totalDistance);
+    Object.assign(result, { distanceMeters: source === null ? null : metric(source * 1000), distanceSourceValue: source, distanceSourceUnit: 'km', distanceUnitBasis: DISTANCE_BASIS });
+  }
   if (!result.startCoordinate && normalized.some(frame => frame.latitude !== null && frame.longitude !== null)) {
     const first = normalized.find(frame => frame.latitude !== null && frame.longitude !== null);
     result.startCoordinate = { latitude: first.latitude, longitude: first.longitude };

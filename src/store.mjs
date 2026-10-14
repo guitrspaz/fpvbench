@@ -1,3 +1,4 @@
+import { prepareDistanceRepair } from './dji-distance.mjs';
 import { mkdir, readFile, writeFile, unlink, lstat, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
@@ -76,6 +77,17 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
     for (const log of state.flightLogs) await safeOriginal(dataDir, log);
     const telemetry = await repository.exportTelemetry();
     validateTelemetry(state, telemetry);
+    const next = await prepareDistanceRepair(state, async log => {
+      const bytes = await safeOriginal(dataDir, log);
+      const decode = decodeFlight ?? (await import('./dji-import.mjs')).decodeDjiFlight;
+      return decode(bytes, { filename: log.filename });
+    });
+    if (next) {
+      validateWorkspace(next);
+      await repository.backup('distance-v046');
+      await repository.save(next, state);
+      state = next;
+    }
   } catch (error) {
     await repository?.close();
     await releaseLock();

@@ -9,6 +9,12 @@ export async function checkEmptyAiSettings({ page, expect, baseURL, provider }) 
   await expect(page.getByLabel('Monthly app allowance (USD)', { exact: true })).toHaveValue('0');
   await expect(page.getByLabel('Enable optional OpenAI assistance', { exact: true })).not.toBeChecked();
   await expect(page.getByRole('button', { name: 'Test connection · small billed API call', exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Display units', { exact: true })).toHaveValue('metric');
+  await page.getByLabel('Display units', { exact: true }).selectOption('imperial');
+  await page.reload();
+  await page.getByRole('button', { name: /Settings/ }).click();
+  await expect(page.getByLabel('Display units', { exact: true })).toHaveValue('imperial');
+  await page.getByLabel('Display units', { exact: true }).selectOption('metric');
   expect(provider.calls).toHaveLength(0);
   await page.getByRole('button', { name: /Overview/ }).click();
   await expect(page.getByRole('button', { name: 'Create AI flight recap', exact: true })).toHaveCount(0);
@@ -106,8 +112,8 @@ export async function runAiJourney({ page, expect, baseURL, provider, experiment
   const evidence = content.locator('.recap-evidence');
   await expect(evidence.locator('summary')).toHaveText('Computed facts used in this recap');
   expect(await evidence.evaluate(node => node.open)).toBe(false);
-  await expect(content.getByLabel('Flight recap highlights')).toContainText('Median flight');
-  await expect(content.getByLabel('Flight recap highlights')).toContainText('Average flight');
+  await expect(content.getByLabel('Flight recap highlights')).toContainText('Median recorded duration');
+  await expect(content.getByLabel('Flight recap highlights')).toContainText('Average recorded duration');
   await expect(content.getByRole('heading', { name: 'Questions to consider', exact: true })).toHaveCount(0);
   await evidence.locator('summary').click();
   expect(await evidence.evaluate(node => node.open)).toBe(true);

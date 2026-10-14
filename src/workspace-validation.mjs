@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { AppError, assertSafeObject, containsControlText } from "./errors.mjs";
 import { parseExport } from "./parser.mjs";
+import { hasVerifiedDistanceSummary, verifiedDistance } from './dji-distance.mjs';
 
 export const aircraftFields = ["name", "kind", "registrationId", "serialNumber", "flightRecordSerials", "status", "notes", "baselineSnapshotId"];
 export const sessionFields = [
@@ -200,6 +201,7 @@ export function validateWorkspace(state) {
   }
 }
 
+const distanceProvenance = ['distanceSourceValue', 'distanceSourceUnit', 'distanceUnitBasis'];
 const summaryNumbers = {
   durationSeconds: [0, 86400], distanceMeters: [0, 100000000],
   maxHeightMeters: [-10000, 100000], maxHorizontalSpeedMps: [0, 1000],
@@ -210,7 +212,10 @@ function bounded(value, field, min, max) {
 
 /** Validate decoder summary evidence without inventing missing values. */
 export function validateSummary(summary) {
-  objectInput(summary, ['startTime', ...Object.keys(summaryNumbers), 'aircraftName', 'aircraftModel', 'aircraftSerial', 'location', 'startCoordinate']);
+  objectInput(summary, ['startTime', ...Object.keys(summaryNumbers), 'aircraftName', 'aircraftModel', 'aircraftSerial', 'location', 'startCoordinate', ...distanceProvenance]);
+  if (distanceProvenance.some(key => Object.hasOwn(summary, key))) {
+    if (!hasVerifiedDistanceSummary(summary)) throw new AppError('Invalid distance source evidence.');
+  }
   if (summary.startTime !== null) isoDate(summary.startTime, 'startTime');
   for (const [field, bounds] of Object.entries(summaryNumbers)) bounded(summary[field], field, ...bounds);
   for (const field of ['aircraftName', 'aircraftModel', 'location']) if (summary[field] !== null) textField(summary[field], field, { max: 1000 });
@@ -250,6 +255,7 @@ export function validateFlightLog(state, record) {
   if (!Array.isArray(record.warnings) || record.warnings.length > 1000) throw new AppError('Invalid flight warnings.');
   record.warnings.forEach(warning => textField(warning, 'warning', { max: 2000 }));
   validateSummary(record.summary);
+  if (record.summary.distanceUnitBasis && !verifiedDistance(record)) throw new AppError('Distance verification does not match this source format.');
   if (state.flightLogs.some(log => log.id !== record.id && log.sha256 === record.sha256)) throw new AppError('Duplicate original flight record.', 409);
 }
 

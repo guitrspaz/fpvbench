@@ -135,6 +135,13 @@ export async function createSqliteRepository(dataDir) {
           db.exec('COMMIT;');
         } catch (error) { db.exec('ROLLBACK;'); throw error; }
       },
+      async backup(tag) {
+        if (!/^[a-z0-9-]+$/.test(tag)) throw new Error('Invalid backup tag.');
+        const destination = join(dataDir, `workspace-before-${tag}-${Date.now()}-${randomUUID()}.sqlite.bak`);
+        await copyFile(filename, destination, constants.COPYFILE_EXCL);
+        await chmod(destination, 0o600);
+        return destination;
+      },
       readFrames: (id, offset, limit) => frameQuery.all(id, limit, offset).map(row => JSON.parse(row.payload)),
       exportTelemetry() {
         return db.prepare('SELECT id FROM flight_logs ORDER BY rowid').all().map(row => ({ flightLogId: row.id, frames: frameQuery.all(row.id, -1, 0).map(frame => JSON.parse(frame.payload)) }));

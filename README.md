@@ -59,6 +59,12 @@ Use the library’s **All aircraft**, **Selected aircraft**, and **Unassigned** 
 
 See [DJI flight imports](repository-docs/dji-flight-imports.md) for formats, measurements, and limits.
 
+## Display units
+
+Open **Settings → Display units** and choose **Metric** or **Imperial**. This browser remembers your choice, including when AI is disabled. Flight distances, heights, speeds, telemetry and newly requested recaps follow it. Stored/exported measurements remain in metres, seconds and metres per second; free-text notes are unchanged. Switching units makes no AI request.
+
+Imported durations describe source-reported record/log time; they may include time on the ground. FPVBench does not present that value as verified airborne time.
+
 ## Optional AI
 
 Open **Settings** to add a server-held OpenAI API key, enable AI, and set a monthly FPVBench allowance. AI starts disabled with a zero allowance. A small billed connection test must succeed before AI controls appear.

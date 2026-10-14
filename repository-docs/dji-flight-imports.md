@@ -35,9 +35,17 @@ The summary may supply flight time, duration, distance, maximum height/speed, ai
 
 Decoded frames appear in a paginated table with available time, position, altitude, battery percentage, and horizontal speed. No remote map tiles are fetched.
 
+## Units and recorded duration
+
+**Settings → Display units** chooses Metric (m/km, m/s) or Imperial (ft/mi, mph) for details and telemetry. The choice is saved in this browser; normalized storage and exports remain SI. Durations are source-reported record/log time, not independently established airborne time.
+
+The TXT v14/product type 137 summary family has an independently verified kilometre distance field. A same-aircraft AirData comparison of 21 retained records established the scale: a source longest path around 6.42 corresponds to approximately 6.42 km, and the combined source distance around 31.63 corresponds to roughly 20 miles. FPVBench converts that specific field to metres and retains the raw value/unit/basis. Explicit `distanceMeters`, decoded JSON, older TXT and other product types are unchanged. This evidence does not establish the distance unit for every DJI model or firmware variant. Other unverified v14 TXT distances remain excluded from AI recap calculations.
+
+Existing applicable summaries receive a backed-up, verified correction on startup; see [storage and backups](storage-and-backups.md). Original bytes are never rewritten. Path length remains distinct from farthest distance from home or the pilot.
+
 ## History and originals
 
-Imported measurements and original bytes are immutable. The separate AirData status is editable. Editing a session changes your observations, not the imported measurements. Each session retains its imported-flight link.
+Imported measurements are read-only in the interface. The documented, verified distance correction can update a normalized summary with retained provenance; original bytes are immutable. The separate AirData status is editable. Editing a session changes your observations, not the imported measurements. Each session retains its imported-flight link.
 
 SHA-256 identifies the original bytes. Automatic reimporting of identical bytes returns the existing record across the fleet or inbox, even under another filename. It never changes an existing assignment or upload status. An explicit import request for a different aircraft is rejected; use the record’s assignment controls to make a deliberate correction.
 

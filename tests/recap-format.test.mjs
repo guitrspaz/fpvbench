@@ -11,5 +11,5 @@ test('recap formats units and precision without hiding missing measurements or z
   expect(formatRecapDistance(null)).toBe('Unknown');
   expect(formatRecapNumber(300.35999999999996)).toBe('300.36');
   const highlights = recapHighlights({ flightCount: 2, importedFlightCount: 1, unlinkedManualSessionCount: 1, durationSeconds: { value: 60, coveredFlights: 1, totalFlights: 2 }, averageDurationSeconds: { value: 60, coveredFlights: 1, totalFlights: 2 }, medianDurationSeconds: { value: 60 } });
-  expect(highlights.find(row => row.label === 'Average flight')).toMatchObject({ value: '1m', detail: '1/2 records with duration' });
+  expect(highlights.find(row => row.label === 'Average recorded duration')).toMatchObject({ value: '1m', detail: '1/2 records with duration' });
 });

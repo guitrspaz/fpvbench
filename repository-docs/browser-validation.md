@@ -22,7 +22,11 @@ FPVBENCH_SCREENSHOT_DIR=/absolute/local/screenshot-directory npm run test:browse
 
 The runner also accepts --screenshot-dir=/absolute/local/directory as a command-line argument. Screenshots contain synthetic test data and are not added to the repository automatically.
 
-## Observed result — v0.3, 2026-10-14
+## Observed result — v0.4.6, 2026-10-14
+
+The full synthetic journey passed with the existing fleet, setup, imports, AirData and optional-AI workflows. Additional checks verify Metric/Imperial settings before aircraft or API-key setup, preference persistence after reload, converted detail distances/heights/speeds, matching telemetry column units, and unchanged server data. Recorded/log duration labels and recap highlights passed. Unit changes produced no provider call. All provider calls used the fake provider; no personal data or live paid calls were used.
+
+## Historical result — v0.3, 2026-10-14
 
 All 41 browser checks passed: the existing 26 setup/session/DJI/AirData checks plus 15 optional-AI checks. The run used Node.js 26.5.0, repository-installed Playwright 1.64.0, and Chromium 149.0.7827.55. Browser test ESLint passed. Desktop was 1440 × 1000; mobile was 390 × 844.
 

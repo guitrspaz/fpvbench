@@ -1,4 +1,5 @@
 import { AppError, containsControlText } from './errors.mjs';
+import { verifiedDistance } from './dji-distance.mjs';
 
 // Explicit names only: arbitrary imported fields and command records are excluded.
 const numericNames = new Set([
@@ -90,10 +91,8 @@ export function validateQuestion(question) {
 
 /** Aggregate imported flights and unlinked manual sessions without double counting. */
 export function flightFacts(state) {
-  // The pinned parser labels v14 header distances as metres, but observed values
-  // conflict with that contract. Keep originals/catalog unchanged; withhold these
-  // distances from recap evidence until the source unit is independently verified.
-  const needsDistanceVerification = log => log.format === 'dji-txt' && log.logVersion === 14 && typeof log.summary.distanceMeters === 'number' && Number.isFinite(log.summary.distanceMeters) && log.summary.distanceMeters >= 0;
+  // Only the independently verified v14/product family supplies usable TXT distance.
+  const needsDistanceVerification = log => log.format === 'dji-txt' && log.logVersion === 14 && !verifiedDistance(log) && typeof log.summary.distanceMeters === 'number' && Number.isFinite(log.summary.distanceMeters) && log.summary.distanceMeters >= 0;
   const distanceWithheldFlightCount = state.flightLogs.filter(needsDistanceVerification).length;
   const records = state.flightLogs.map(log => ({ aircraftId: log.aircraftId, startTime: log.summary.startTime, durationSeconds: log.summary.durationSeconds, distanceMeters: needsDistanceVerification(log) ? null : log.summary.distanceMeters, maxHeightMeters: log.summary.maxHeightMeters }));
   const manual = state.sessions.filter(session => !session.flightLogId).map(session => ({ aircraftId: session.aircraftId, startTime: session.flownAt, durationSeconds: session.durationMinutes === null ? null : session.durationMinutes * 60, distanceMeters: null, maxHeightMeters: null }));
@@ -131,6 +130,7 @@ export function flightFacts(state) {
   return {
     flightCount: records.length, importedFlightCount: state.flightLogs.length, unassignedFlightCount: state.flightLogs.filter(log => log.aircraftId === null).length, unlinkedManualSessionCount: manual.length,
     linkedSessionCount: state.sessions.filter(session => session.flightLogId).length,
+    durationBasis: 'Imported durations are source-reported record/log time, not independently established airborne time. Manual durations are user-entered.',
     durationSeconds: measurement('durationSeconds', sum),
     averageDurationSeconds: measurement('durationSeconds', average),
     medianDurationSeconds: measurement('durationSeconds', median),

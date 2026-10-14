@@ -1,4 +1,4 @@
-import { formatRecapNumber, recapHighlights } from "./recap-format.js";
+import { formatRecapNumber, recapHighlights, displayUnits, formatRecapDistance, formatRecapDuration, formatRecapHeight, formatRecapSpeed, heightValue, speedValue } from "./recap-format.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const content = $("#content");
@@ -6,6 +6,7 @@ let state = { aircraft: [], snapshots: [], sessions: [], flightLogs: [] };
 let aircraftId = localStorage.getItem("fpvbench.aircraft") || "";
 const savedFleetStatus = localStorage.getItem("fpvbench.fleetStatus");
 let fleetStatus = ["active", "all", "retired"].includes(savedFleetStatus) ? savedFleetStatus : "active";
+let units = displayUnits(localStorage.getItem("fpvbench.units"));
 let currentView = "overview";
 let detailId = null;
 let editingSessionId = null;
@@ -933,6 +934,15 @@ function money(value) {
 
 function showSettings() {
   const settings = aiSettings;
+  const display = element("section", { class: "panel" }, panelHeading("Display preferences", "Choose units for flight details, telemetry and recaps."));
+  const unitSelect = element("select", { id: "display-units", "aria-label": "Display units" }, element("option", { value: "metric", text: "Metric (m, km, m/s)" }), element("option", { value: "imperial", text: "Imperial (ft, mi, mph)" }));
+  unitSelect.value = units;
+  unitSelect.addEventListener("change", () => {
+    units = displayUnits(unitSelect.value);
+    localStorage.setItem("fpvbench.units", units);
+    notify("Display units saved.");
+  });
+  display.append(element("label", {}, "Display units", unitSelect), element("p", { class: "form-help", text: "Saved for this browser. Stored measurements remain unchanged. Changing units makes no AI call." }));
   const panel = element("section", { class: "panel settings-panel" }, panelHeading("OpenAI API (ChatGPT models)",
     "This API-key integration uses separate OpenAI API billing."));
   const form = element("form", { id: "ai-settings-form" });
@@ -1014,7 +1024,7 @@ function showSettings() {
     check,
     element("p", { class: "form-help", text: `Model: ${settings.model || "Not available"}${settings.priceCheckedAt ? ` · Pricing checked ${settings.priceCheckedAt}` : ""}. Checks and analyses use the configured monthly allowance.` }));
   panel.append(form);
-  content.replaceChildren(panel, status);
+  content.replaceChildren(display, panel, status);
 }
 
 function aiReportContent(envelope) {
@@ -1025,7 +1035,7 @@ function aiReportContent(envelope) {
   output.append(element("p", { class: "ai-disclosure", text: isRecap ? "AI flight summary · based on the recorded evidence below." : "AI-generated explanation · verify against your setup and the referenced documentation." }));
   if (isRecap && envelope.facts) {
     const highlights = element("dl", { class: "recap-highlights", "aria-label": "Flight recap highlights" });
-    for (const row of recapHighlights(envelope.facts)) highlights.append(element("div", {}, element("dt", { text: row.label }), element("dd", { text: row.value }), element("small", { text: row.detail })));
+    for (const row of recapHighlights(envelope.facts, envelope.context?.units ?? units)) highlights.append(element("div", {}, element("dt", { text: row.label }), element("dd", { text: row.value }), element("small", { text: row.detail })));
     output.append(highlights);
     if (envelope.facts.distanceWithheldFlightCount) output.append(element("p", { class: "proof-note", text: `Distance findings are withheld for ${envelope.facts.distanceWithheldFlightCount} TXT records while their source units are verified. Duration and date findings remain available.` }));
   }
@@ -1135,6 +1145,7 @@ function snapshotAiPanel(snapshot, revision) {
 function recapPanel(revision) {
   const aircraft = selectedAircraft();
   const recapAircraftId = aircraft.id;
+  const recapUnits = units;
   const panel = element("section", { class: "panel ai-feature", id: "ai-flight-recap" },
     panelHeading("A light flight recap", `For ${aircraft.name}. AI explains computed facts from this aircraft’s imported logs and manual sessions only; coverage counts remain visible.`));
   const result = element("div", { "aria-live": "polite" });
@@ -1143,11 +1154,11 @@ function recapPanel(revision) {
     target.disabled = true;
     result.replaceChildren(element("p", { class: "loading", text: `Preparing the flight recap for ${aircraft.name}…` }));
     try {
-      const response = await aiAction("/api/ai/recap", { aircraftId: recapAircraftId });
-      if (revision === renderRevision && aircraftId === recapAircraftId && aiSettings.available) result.replaceChildren(aiReportContent(response));
+      const response = await aiAction("/api/ai/recap", { aircraftId: recapAircraftId, units: recapUnits });
+      if (revision === renderRevision && aircraftId === recapAircraftId && units === recapUnits && aiSettings.available) result.replaceChildren(aiReportContent(response));
     } catch (error) {
       notify(error.message, true);
-      if (revision === renderRevision && aircraftId === recapAircraftId && aiSettings.available) result.replaceChildren(warningBox([error.message]));
+      if (revision === renderRevision && aircraftId === recapAircraftId && units === recapUnits && aiSettings.available) result.replaceChildren(warningBox([error.message]));
     } finally { target.disabled = false; }
   }, "primary");
   panel.append(recap, element("p", { class: "proof-note", text: "This sends only the selected aircraft’s label and aggregate measurements to OpenAI, without coordinates, notes, raw telemetry, or original files. Distance describes distance flown, not range from the pilot." }), result);
@@ -1329,10 +1340,10 @@ async function showFlightDetail(id, revision) {
     const properties = element("dl", { class: "flight-properties" });
     [
       ["Flight start", summary.startTime ? date(summary.startTime, true) : "Not available"],
-      ["Duration", metric(summary.durationSeconds, "seconds")],
-      ["Distance", metric(summary.distanceMeters, "m")],
-      ["Maximum height", metric(summary.maxHeightMeters, "m")],
-      ["Maximum horizontal speed", metric(summary.maxHorizontalSpeedMps, "m/s")],
+      ["Recorded / log duration", formatRecapDuration(summary.durationSeconds)],
+      ["Flown path distance", formatRecapDistance(summary.distanceMeters, units)],
+      ["Maximum height", formatRecapHeight(summary.maxHeightMeters, units)],
+      ["Maximum horizontal speed", formatRecapSpeed(summary.maxHorizontalSpeedMps, units)],
       ["Aircraft name", summary.aircraftName || "Not available"],
       ["Aircraft model", summary.aircraftModel || "Not available"],
       ["Recorded aircraft serial", summary.aircraftSerial || "Not available"],
@@ -1343,7 +1354,7 @@ async function showFlightDetail(id, revision) {
       ["Telemetry frames", metric(log.frameCount, "", 0)],
     ].forEach(([label, value]) => properties.append(element("div", {}, element("dt", { text: label }), element("dd", { text: value }))));
     panel.append(properties,
-      element("p", { class: "proof-note", text: "Values are sourced from this flight record. Unavailable fields stay unknown. Telemetry does not describe or confirm Betaflight settings." }));
+      element("p", { class: "proof-note", text: "Values are sourced from this flight record. Recorded duration may include time on the ground; it is not verified airborne time. Unavailable fields stay unknown. Telemetry does not describe or confirm Betaflight settings." }));
     const assignment = element("select", { "aria-label": "Assign flight to aircraft" },
       element("option", { value: "", text: "Choose an aircraft" }),
       ...state.aircraft.map(aircraft => element("option", { value: aircraft.id, text: aircraftLabel(aircraft) })));
@@ -1409,10 +1420,10 @@ async function showFlightDetail(id, revision) {
         const result = await api(`/api/flight-logs/${encodeURIComponent(id)}/frames?offset=${offset}&limit=${pageSize}`);
         if (revision !== renderRevision || requestRevision !== frameRevision) return;
         const table = element("table", {}, element("thead", {}, element("tr", {},
-          ...["Time", "Elapsed (s)", "Latitude", "Longitude", "Altitude (m)", "Battery (%)", "Speed (m/s)"].map(text => element("th", { scope: "col", text })))),
+          ...["Time", "Elapsed (s)", "Latitude", "Longitude", units === "imperial" ? "Altitude (ft)" : "Altitude (m)", "Battery (%)", units === "imperial" ? "Speed (mph)" : "Speed (m/s)"].map(text => element("th", { scope: "col", text })))),
         element("tbody", {}, ...result.frames.map(frame => element("tr", {},
           element("td", { text: frame.timestamp ? date(frame.timestamp, true) : "Unknown" }),
-          ...[frame.elapsedSeconds, frame.latitude, frame.longitude, frame.altitudeMeters, frame.batteryPercent, frame.horizontalSpeedMps]
+          ...[frame.elapsedSeconds, frame.latitude, frame.longitude, heightValue(frame.altitudeMeters, units), frame.batteryPercent, speedValue(frame.horizontalSpeedMps, units)]
             .map((value, index) => element("td", { text: metric(value, "", index === 1 || index === 2 ? 6 : 2) }))))));
         frameArea.replaceChildren(element("div", { class: "table-wrap" }, table));
         count.textContent = `${result.frames.length ? offset + 1 : 0}–${offset + result.frames.length} of ${result.total} frames`;

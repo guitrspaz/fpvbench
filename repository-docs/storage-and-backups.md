@@ -2,7 +2,7 @@
 
 ## Data directory
 
-FPVBench defaults to `~/.fpvbench/` on the computer running the server. Browser storage remembers the selected aircraft and fleet status filter. Set `FPVBENCH_DATA_DIR` to use another local directory.
+FPVBench defaults to `~/.fpvbench/` on the computer running the server. Browser storage remembers the selected aircraft, fleet status filter and Metric/Imperial display preference. Display units do not change measurements in SQLite or exports. Set `FPVBENCH_DATA_DIR` to use another local directory.
 
 `workspace.sqlite` contains the catalog and decoded telemetry. Exact original DJI bytes live in `imports/` under their SHA-256 fingerprints. Keep the whole data directory together when moving it while the server is stopped.
 
@@ -23,6 +23,12 @@ The exact SQLite backup preserves the pre-upgrade database. Retain the matching 
 ## Active and retired aircraft
 
 v0.4.2 stores an optional aircraft status in its existing SQLite payload. Existing aircraft and older backups without a status are treated as active; no database schema migration is needed. Retiring or reactivating an aircraft preserves its ID, setups, baseline, flight links, serial matching, and AirData status. The status is included in complete exports and preserved on restore. The sidebar filter affects visibility only.
+
+## Verified distance correction in v0.4.6
+
+The correction applies only to DJI TXT version 14/product type 137 (the independently checked Mavic 4 Pro summary family). On opening an older catalog, the app checks original fingerprints and stored telemetry, re-decodes the applicable originals, and requires all unrelated summary values to match. It prepares and validates the whole correction before saving an exact owner-private SQLite backup named `workspace-before-distance-v046-<timestamp>-<uuid>.sqlite.bak`, then saves once transactionally. Verification or backup failure refuses the correction without changing the catalog.
+
+IDs, assignments, sessions, notes, AirData status, other flight records, and original bytes remain unchanged. Corrected summaries retain their exact raw distance, kilometre source unit, and bounded verification basis. Reopening or reimporting does not multiply an already corrected value again. Restored older complete backups receive the same verification on their next open. Keep the matching imports directory with the pre-correction SQLite backup.
 
 ## Complete export
 

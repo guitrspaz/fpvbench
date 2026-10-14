@@ -85,10 +85,11 @@ test('flight recap returns computed facts and respects origin and input boundari
   await enable();
   const other = await (await request('/api/aircraft', { name: 'Other private aircraft' })).json();
   await request('/api/sessions', { aircraftId: other.id, title: 'Other flight', flownAt: '2026-10-14T13:00:00Z', durationMinutes: 100 });
-  const recap = await request('/api/ai/recap', { aircraftId: aircraft.id });
+  const recap = await request('/api/ai/recap', { aircraftId: aircraft.id, units: 'imperial' });
   expect(recap.status).toBe(200);
   const report = await recap.json();
   expect(report.context.aircraftId).toBe(aircraft.id);
+  expect(report.context.units).toBe('imperial');
   expect(report.facts.flightCount).toBe(1);
   expect(report.facts.durationSeconds.value).toBe(120);
   const providerBody = fetchImpl.mock.calls[1][1].body;
@@ -99,7 +100,7 @@ test('flight recap returns computed facts and respects origin and input boundari
   expect((await request('/api/ai/check', {}, 'POST', { Origin: 'https://other.example' })).status).toBe(403);
   expect((await request('/api/ai/review', { snapshotId: snapshot.id, question: 'x'.repeat(1001) })).status).toBe(400);
   expect((await request('/api/ai/review', { snapshotId: snapshot.id, rawText })).status).toBe(400);
-  for (const input of [{}, null, [], { aircraftId: '' }, { aircraftId: 42 }, { aircraftId: aircraft.id, apiKey: credential }])
+  for (const input of [{}, null, [], { aircraftId: '' }, { aircraftId: 42 }, { aircraftId: aircraft.id, apiKey: credential }, { aircraftId: aircraft.id, units: 'invalid' }])
     expect((await request('/api/ai/recap', input)).status).toBe(400);
   expect((await request('/api/ai/recap', { aircraftId: 'missing' })).status).toBe(404);
   expect((await request('/api/ai/settings', { provider: 'other' }, 'PATCH')).status).toBe(400);

@@ -21,11 +21,19 @@ node dev/verify-dji.mjs
 node dev/verify-sqlite.mjs
 node dev/verify-import.mjs
 node dev/verify-ai.mjs
+node dev/verify-distance.mjs
 ```
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.4.5 results — 2026-10-14
+## Observed v0.4.6 results — 2026-10-14
+
+- 142 Jest tests passed across thirteen suites; ESLint passed. New checks cover bounded source conversion, zero/missing measurements, unchanged JSON/other product types, backup-before-save ordering, refusal on mismatched source evidence or failed backup, preservation of notes/status/originals, restart idempotence, unit conversion, per-unit recap cache and API input validation.
+- The full synthetic browser journeys passed, including units accessible with AI disabled, preference persistence after reload, imperial flight-detail values and telemetry headers, and unchanged server-side data. Fake provider requests only; no paid AI calls.
+- The separate disposable SQLite/worker/WASM proof passed exact private pre-correction backup, preserved originals/history, duplicate import, restart and old complete-catalog restore.
+- Independent supplied AirData totals established the kilometre scale only for the retained Mavic 4 Pro TXT v14/product 137 summary family. Unverified v14 TXT families remain withheld from recap distance facts. Duration remains source-reported log time; AirData airborne totals are not substituted into stored records.
+
+## Historical v0.4.5 results — 2026-10-14
 
 - 134 Jest tests passed across twelve suites; ESLint passed. New checks cover plist/XML and launcher quoting, login/on-demand paths, exact manual-server identity, duplicate-owner refusal, lifecycle ordering, and data-free readiness responses.
 - A separately scoped isolated operational proof registered a temporary user LaunchAgent on a high loopback port with a disposable synthetic workspace. Plist validation, native launcher compilation, background readiness and matching job/lock PID passed. Crash recovery, stop/restart with retained synthetic SQLite history, and clean shutdown passed. The proof job and temporary artifacts were removed.
@@ -72,7 +80,8 @@ These explicit proofs exercise actual SQLite and worker/WASM behavior; their tem
 - **94 Jest tests passed** across nine suites; application, test, and operational-proof ESLint passed.
 - **41 browser checks passed**, covering the previous workflows plus optional AI settings, key privacy, explicit connection checking, setup/goal explanations, cached reads, aggregate recap, automatic reviews, quota shutdown, recovery, zero allowance, and mobile layout. Screenshots were inspected. See [browser validation](browser-validation.md).
 - **npm audit reported zero vulnerabilities**. No new runtime package was needed.
-- `node dev/verify-ai.mjs` passed the combined actual SQLite/server proof with a synthetic provider: owner-private key files, gating, durable allowance/cache across restart, unchanged core export, billing shutdown with offline recordkeeping, and corrupt optional-state fallback.
+- `node dev/verify-ai.mjs
+node dev/verify-distance.mjs` passed the combined actual SQLite/server proof with a synthetic provider: owner-private key files, gating, durable allowance/cache across restart, unchanged core export, billing shutdown with offline recordkeeping, and corrupt optional-state fallback.
 - Private AI files and local data are excluded from Git. Staged source secret scanning passed.
 
 All provider responses and credentials in the automated and operational AI proofs are synthetic. No real paid request, live account balance check, or model-quality evaluation was performed. The live integration requires a user-entered API key, positive local allowance, and a successful explicit connection check. The local allowance is an estimate rather than an account-wide provider cap.
