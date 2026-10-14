@@ -22,6 +22,7 @@
         <option value="">Loading…</option>
       </select>
       <button id="add-aircraft" class="subtle wide">+ Add aircraft</button>
+      <button id="edit-aircraft" class="subtle wide" disabled>Edit aircraft</button>
       <nav aria-label="Workbench views">
         <button class="nav-item active" data-view="overview">
           <span aria-hidden="true">◈</span> Overview
@@ -105,6 +106,11 @@
             maxlength="120"
             placeholder="e.g. Betaflight freestyle quad"
         /></label>
+        <div class="form-grid">
+          <label>Registration ID<input name="registrationId" maxlength="200" autocomplete="off" spellcheck="false" /></label>
+          <label>Serial number<input name="serialNumber" maxlength="200" autocomplete="off" spellcheck="false" /></label>
+        </div>
+        <p class="form-help">Registration ID and serial number are optional.</p>
         <label
           >Notes<textarea
             name="notes"

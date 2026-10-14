@@ -22,8 +22,42 @@ export async function runJourney({ page, expect, baseURL, baselineText, experime
   const aircraftDialog = page.getByRole('dialog', { name: 'Add an aircraft' });
   await aircraftDialog.getByLabel('Aircraft name').fill('Synthetic smoke quad');
   await aircraftDialog.getByLabel('Type / build').fill('Synthetic Betaflight fixture');
+  await aircraftDialog.getByLabel('Registration ID').fill('SYNTHETIC-REG');
+  await aircraftDialog.getByLabel('Serial number').fill('Synthetic-SN-001');
   await aircraftDialog.getByRole('button', { name: 'Add aircraft', exact: true }).click();
   await expect(aircraftDialog).not.toBeVisible();
+  await expect(page.getByText('SYNTHETIC-REG', { exact: true })).toBeVisible();
+  await expect(page.getByText('Synthetic-SN-001', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit aircraft', exact: true }).click();
+  const editAircraft = page.getByRole('dialog', { name: 'Edit aircraft', exact: true });
+  await expect(editAircraft.getByLabel('Registration ID')).toHaveValue('SYNTHETIC-REG');
+  await editAircraft.getByLabel('Registration ID').fill('SYNTHETIC-REG-EDITED');
+  await editAircraft.getByLabel('Serial number').fill('Synthetic-SN-Edited');
+  await editAircraft.getByRole('button', { name: 'Save aircraft', exact: true }).click();
+  await expect(editAircraft).not.toBeVisible();
+  await page.reload();
+  await expect(page.getByText('SYNTHETIC-REG-EDITED', { exact: true })).toBeVisible();
+  await expect(page.getByText('Synthetic-SN-Edited', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: '+ Add aircraft', exact: true }).click();
+  await expect(aircraftDialog.getByLabel('Registration ID')).toHaveValue('');
+  await expect(aircraftDialog.getByLabel('Serial number')).toHaveValue('');
+  await aircraftDialog.getByLabel('Aircraft name').fill('Synthetic second quad');
+  await aircraftDialog.getByRole('button', { name: 'Add aircraft', exact: true }).click();
+  await expect(aircraftDialog).not.toBeVisible();
+  await expect(page.getByText('Not recorded', { exact: true })).toHaveCount(3);
+  await page.getByLabel('Selected aircraft').selectOption({ label: 'Synthetic smoke quad' });
+  await page.getByRole('button', { name: 'Edit aircraft', exact: true }).click();
+  await expect(editAircraft.getByLabel('Registration ID')).toHaveValue('SYNTHETIC-REG-EDITED');
+  await expect(editAircraft.getByLabel('Serial number')).toHaveValue('Synthetic-SN-Edited');
+  await editAircraft.getByLabel('Registration ID').fill('');
+  await editAircraft.getByLabel('Serial number').fill('');
+  await editAircraft.getByRole('button', { name: 'Save aircraft', exact: true }).click();
+  await expect(editAircraft).not.toBeVisible();
+  await expect(page.getByText('Not recorded', { exact: true })).toHaveCount(2);
+  const aircraftState = await (await page.request.get(baseURL + '/api/state')).json();
+  expect(aircraftState.aircraft).toHaveLength(2);
+  expect(aircraftState.aircraft[0]).toMatchObject({ registrationId: '', serialNumber: '' });
 
   for (const [label, rawText] of [
     ['Baseline smoke', '\ufeff' + baselineText.replace(/\r?\n/g, '\r\n')],
@@ -118,7 +152,7 @@ export async function runJourney({ page, expect, baseURL, baselineText, experime
   page.off('pageerror', onPageError);
   page.off('console', onConsole);
   return {
-    passed: ['empty state', 'create aircraft', 'BOM/CRLF file import and exact raw download', 'paste import', 'baseline',
+    passed: ['empty state', 'create aircraft with identifiers', 'edit identifiers', 'reload identifiers', 'add resets prior identifiers', 'switch aircraft preserves identifiers', 'clear identifiers', 'BOM/CRLF file import and exact raw download', 'paste import', 'baseline',
       'changed and sparse-unknown comparison', 'comparison filter', 'inert imported HTML',
       'linked confirmed session', 'edit session', 'reload persistence', 'mobile overflow', 'browser errors'],
     errors,

@@ -28,6 +28,8 @@ Core application features and assets run locally without an account or cloud ser
 
 A session's setup confirmation is explicit. A stored snapshot records an import; it does not establish the aircraft's current configuration. The two Betaflight examples are synthetic parser fixtures, not aircraft configurations.
 
+Aircraft records include optional **Registration ID** and **Serial number** fields. Select an aircraft and choose **Edit aircraft** to add, update, or clear either identifier, or change its name, type, and notes. Identifiers appear in **Aircraft details** on the overview and are retained in SQLite and workspace exports. Older workspaces and backups without these fields still open. Registration IDs and serial numbers are excluded from AI requests; keep exports containing them private.
+
 Each setting retains its scope and PID/rate profile. A missing value in a sparse `diff all` export is shown as **unknown**, because the underlying firmware default is not included. Firmware or board differences are flagged. See the [Betaflight import guide](repository-docs/betaflight-imports.md).
 
 ## DJI flight imports

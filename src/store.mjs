@@ -124,7 +124,7 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
     },
     createAircraft: input => mutate(next => {
       objectInput(input, aircraftFields.filter(field => field !== 'baselineSnapshotId'));
-      const record = { id: randomUUID(), name: input.name, kind: input.kind ?? '', notes: input.notes ?? '', baselineSnapshotId: null, createdAt: timestamp() };
+      const record = { id: randomUUID(), name: input.name, kind: input.kind ?? '', registrationId: input.registrationId === undefined ? '' : input.registrationId, serialNumber: input.serialNumber === undefined ? '' : input.serialNumber, notes: input.notes ?? '', baselineSnapshotId: null, createdAt: timestamp() };
       next.aircraft.push(record); validateAircraft(next, record); return { value: record };
     }),
     updateAircraft: (id, input) => mutate(next => {

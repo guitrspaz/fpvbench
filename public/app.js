@@ -5,6 +5,7 @@ let aircraftId = localStorage.getItem("fpvbench.aircraft") || "";
 let currentView = "overview";
 let detailId = null;
 let editingSessionId = null;
+let editingAircraftId = null;
 let editingFlightLogId = null;
 let flightDetailId = null;
 let renderRevision = 0;
@@ -113,6 +114,7 @@ async function refresh() {
   $("#import-snapshot").disabled = !aircraftId;
   $("#new-session").disabled = !aircraftId;
   $("#import-flights").disabled = !aircraftId;
+  $("#edit-aircraft").disabled = !aircraftId;
   await render();
 }
 
@@ -136,7 +138,7 @@ function showOnboarding() {
   const panel = empty(
     "A fresh start for your fleet",
     "Keep your preferred setup, see what changed, and connect each experiment to a flight. Start by adding your first aircraft.",
-    () => openDialog("aircraft"),
+    () => openAircraft(),
     "+ Add your first aircraft",
   );
   panel.classList.add("onboarding");
@@ -255,6 +257,11 @@ function stat(label, value, note) {
 }
 
 function showOverview() {
+  const aircraft = selectedAircraft();
+  const identifiers = element("dl", { class: "flight-properties" });
+  for (const [label, value] of [["Type / build", aircraft.kind], ["Registration ID", aircraft.registrationId], ["Serial number", aircraft.serialNumber]])
+    identifiers.append(element("div", {}, element("dt", { text: label }), element("dd", { text: value || "Not recorded" })));
+  const aircraftPanel = element("section", { class: "panel" }, panelHeading("Aircraft details"), identifiers);
   const history = snapshots();
   const flights = sessions();
   const baseline = history.find(
@@ -378,6 +385,7 @@ function showOverview() {
     );
   content.replaceChildren(
     stats,
+    aircraftPanel,
     element("div", { class: "two-col" }, historyPanel, baselinePanel),
     flightPanel,
   );
@@ -947,7 +955,7 @@ function showSettings() {
       element("span", {}, "Automatically review newly imported Betaflight setups",
         element("small", { text: "Opt in to one billed analysis after an import when AI is available. Importing still succeeds if analysis fails; there are no automatic retries." }))),
     element("div", { class: "ai-consent" }, element("h3", { text: "What leaves this computer" }),
-      element("p", { text: "Setup analysis sends selected tuning, rate, filter, and protocol settings plus your optional goal question to OpenAI. Flight recaps send aggregate measurements and aircraft labels. Exact coordinates, locations, notes, media references, serials, and original files are excluded." }),
+      element("p", { text: "Setup analysis sends selected tuning, rate, filter, and protocol settings plus your optional goal question to OpenAI. Flight recaps send aggregate measurements and aircraft labels. Exact coordinates, locations, notes, media references, registration IDs, serial numbers, and original files are excluded." }),
       element("p", { text: "Advice explains existing evidence and may require verification. FPVBench does not generate or apply controller configurations." })),
     errorNode, element("div", { class: "form-actions" }, remove, save));
   form.addEventListener("submit", async event => {
@@ -1527,10 +1535,18 @@ function submitForm(formId, save) {
   });
 }
 
-$("#add-aircraft").addEventListener("click", () => {
-  $("#aircraft-form").reset();
+function openAircraft(aircraft = null) {
+  const form = $("#aircraft-form");
+  form.reset();
+  editingAircraftId = aircraft?.id ?? null;
+  for (const field of ["name", "kind", "registrationId", "serialNumber", "notes"])
+    form.elements[field].value = aircraft?.[field] ?? "";
+  $("#aircraft-title").textContent = aircraft ? "Edit aircraft" : "Add an aircraft";
+  $("button[type=submit]", form).textContent = aircraft ? "Save aircraft" : "Add aircraft";
   openDialog("aircraft");
-});
+}
+$("#add-aircraft").addEventListener("click", () => openAircraft());
+$("#edit-aircraft").addEventListener("click", () => openAircraft(selectedAircraft()));
 $("#import-snapshot").addEventListener("click", openImport);
 $("#new-session").addEventListener("click", () => openSession());
 $("#import-flights").addEventListener("click", openFlightImport);
@@ -1602,15 +1618,18 @@ $("#import-form").elements.rawText.addEventListener("input", () => {
 });
 
 submitForm("aircraft-form", async (form) => {
-  const result = await api("/api/aircraft", {
+  const editing = Boolean(editingAircraftId);
+  const result = await api(editing ? `/api/aircraft/${encodeURIComponent(editingAircraftId)}` : "/api/aircraft", {
     name: form.elements.name.value,
     kind: form.elements.kind.value,
+    registrationId: form.elements.registrationId.value,
+    serialNumber: form.elements.serialNumber.value,
     notes: form.elements.notes.value,
-  });
+  }, editing ? "PATCH" : "POST");
   aircraftId = result.id;
   currentView = "overview";
   detailId = null;
-  notify("Aircraft added. Your workbench is ready.");
+  notify(editing ? "Aircraft details saved." : "Aircraft added. Your workbench is ready.");
 });
 
 submitForm("import-form", async (form) => {

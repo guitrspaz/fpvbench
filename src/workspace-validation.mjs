@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { AppError, assertSafeObject, containsControlText } from "./errors.mjs";
 import { parseExport } from "./parser.mjs";
 
-export const aircraftFields = ["name", "kind", "notes", "baselineSnapshotId"];
+export const aircraftFields = ["name", "kind", "registrationId", "serialNumber", "notes", "baselineSnapshotId"];
 export const sessionFields = [
   "aircraftId",
   "snapshotId",
@@ -89,6 +89,9 @@ function snapshotRelationship(state, aircraftId, snapshotId) {
 export function validateAircraft(state, record) {
   textField(record.name, "name", { required: true, max: 200 });
   textField(record.kind, "kind", { max: 200 });
+  // Older catalogs and backups may omit these optional aircraft identifiers.
+  for (const field of ["registrationId", "serialNumber"])
+    if (Object.hasOwn(record, field)) textField(record[field], field, { max: 200 });
   textField(record.notes, "notes");
   snapshotRelationship(state, record.id, record.baselineSnapshotId);
 }

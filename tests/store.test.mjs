@@ -4,12 +4,49 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStore } from '../src/store.mjs';
 import { createMemoryRepository } from './helpers/memory-repository.mjs';
+import { validateCompleteBackup } from '../src/restore.mjs';
 
 let dir, store, aircraft, repository;
 const openStore = () => createStore(dir, { repositoryFactory: () => repository });
 const rawText = '# dump all\n# Betaflight / TEST 4.5.1 / MSP API: 1.46\nset test = 1\nsave\n';
 beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'fpvbench-test-')); repository = createMemoryRepository(); store = await openStore(); aircraft = await store.createAircraft({ name: 'Test quad' }); });
 afterEach(async () => { await store.close(); await rm(dir, { recursive: true, force: true }); });
+
+test('aircraft identifiers survive editing, reopening and backup, and can be cleared', async () => {
+  const made = await store.createAircraft({ name: 'Identifier quad', kind: 'FPV', registrationId: 'FA-SYNTHETIC', serialNumber: 'sn-Synthetic-001' });
+  await store.updateAircraft(made.id, { name: 'Renamed quad', notes: 'Updated' });
+  await store.close();
+  store = await openStore();
+  const saved = store.getState().aircraft.find(item => item.id === made.id);
+  expect(saved).toMatchObject({ name: 'Renamed quad', kind: 'FPV', registrationId: 'FA-SYNTHETIC', serialNumber: 'sn-Synthetic-001' });
+  const backup = await store.exportWorkspace();
+  expect(validateCompleteBackup(backup).catalog.aircraft.find(item => item.id === made.id)).toEqual(saved);
+  await store.updateAircraft(made.id, { registrationId: '', serialNumber: '' });
+  expect(store.getState().aircraft.find(item => item.id === made.id)).toMatchObject({ registrationId: '', serialNumber: '' });
+});
+
+test('older aircraft without identifiers remain readable, editable and valid in backups', async () => {
+  const backup = await store.exportWorkspace();
+  delete backup.aircraft[0].registrationId;
+  delete backup.aircraft[0].serialNumber;
+  const { catalog } = validateCompleteBackup(backup);
+  await store.close();
+  repository.save(catalog);
+  store = await openStore();
+  expect(store.getState().aircraft[0].id).toBe(aircraft.id);
+  await store.updateAircraft(aircraft.id, { name: 'Older quad renamed' });
+  await store.updateAircraft(aircraft.id, { registrationId: 'SYNTHETIC', serialNumber: 'Older-Serial' });
+  expect(store.getState().aircraft[0]).toMatchObject({ name: 'Older quad renamed', registrationId: 'SYNTHETIC', serialNumber: 'Older-Serial' });
+});
+
+test.each(['registrationId', 'serialNumber'])('invalid %s is rejected without changing aircraft', async field => {
+  const before = store.getState();
+  for (const value of [null, 42, {}, 'x'.repeat(201), 'bad\u0000identifier']) {
+    await expect(store.createAircraft({ name: 'Invalid quad', [field]: value })).rejects.toThrow();
+    await expect(store.updateAircraft(aircraft.id, { [field]: value })).rejects.toThrow();
+    expect(store.getState()).toEqual(before);
+  }
+});
 
 test('exact raw preservation, summaries, immutability and restart', async () => {
   const data = { aircraftId: aircraft.id, label: 'Baseline', filename: 'test.txt', rawText };
