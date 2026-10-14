@@ -13,6 +13,7 @@ let fileReading = false;
 let importFilename = "pasted-export.txt";
 let originalFileText = null;
 let noticeTimer;
+let aiSettings = { available: false };
 
 function element(tag, attributes = {}, ...children) {
   const node = document.createElement(tag);
@@ -97,7 +98,7 @@ function notify(message, error = false) {
 }
 
 async function refresh() {
-  state = await api("/api/state");
+  [state] = await Promise.all([api("/api/state"), readAiSettings()]);
   if (!selectedAircraft()) aircraftId = state.aircraft[0]?.id || "";
   localStorage.setItem("fpvbench.aircraft", aircraftId);
   const selector = $("#aircraft-select");
@@ -193,6 +194,7 @@ const viewCopy = {
     "Connect your setup to conditions, observations, and results.",
   ],
   flights: ["FROM YOUR FLIGHT RECORDS", "DJI flight imports", "Original files, sourced flight details, and available local telemetry."],
+  settings: ["OPTIONAL ASSISTANCE", "Settings", "Keep the workbench offline, or enable an optional OpenAI assistant."],
 };
 
 async function render() {
@@ -200,7 +202,7 @@ async function render() {
   const [eyebrow, title, description] = viewCopy[currentView];
   $("#page-eyebrow").textContent = eyebrow;
   $("#page-title").textContent = title;
-  $("#page-description").textContent = selectedAircraft()
+  $("#page-description").textContent = selectedAircraft() && currentView !== "settings"
     ? `${selectedAircraft().name} · ${description}`
     : description;
   $("#breadcrumb").textContent =
@@ -211,6 +213,8 @@ async function render() {
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   });
+  $(".heading-actions").hidden = currentView === "settings";
+  if (currentView === "settings") return showSettings();
   if (!aircraftId) return showOnboarding();
   if (currentView === "overview") showOverview();
   if (currentView === "history") {
@@ -377,6 +381,7 @@ function showOverview() {
     element("div", { class: "two-col" }, historyPanel, baselinePanel),
     flightPanel,
   );
+  if (aiSettings.available) content.append(recapPanel(renderRevision));
 }
 
 function snapshotRow(snapshot) {
@@ -640,6 +645,10 @@ async function showDetail(id, revision) {
     );
     update();
     content.replaceChildren(panel);
+    if (aiSettings.available) {
+      const assistantPanel = snapshotAiPanel(snapshot, revision);
+      content.prepend(assistantPanel);
+    }
   } catch (error) {
     if (revision === renderRevision)
       content.replaceChildren(
@@ -881,6 +890,235 @@ function outcomeBadge(outcome) {
     }[outcome] || "NOT RATED",
     outcome === "better" ? "green" : outcome === "worse" ? "red" : "",
   );
+}
+
+async function readAiSettings() {
+  try { aiSettings = await api("/api/ai/settings"); }
+  catch { aiSettings = { available: false, reason: "Optional AI settings are unavailable. The offline workbench remains usable." }; }
+  if (!aiSettings.available) document.querySelectorAll(".ai-feature").forEach(node => node.remove());
+  return aiSettings;
+}
+
+async function aiAction(path, payload, method = "POST") {
+  try { return await api(path, payload, method); }
+  finally { await readAiSettings(); }
+}
+
+function money(value) {
+  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(value ?? 0);
+}
+
+function showSettings() {
+  const settings = aiSettings;
+  const panel = element("section", { class: "panel settings-panel" }, panelHeading("OpenAI API (ChatGPT models)",
+    "This API-key integration uses separate OpenAI API billing."));
+  const form = element("form", { id: "ai-settings-form" });
+  const key = element("input", { type: "password", name: "apiKey", id: "ai-api-key", autocomplete: "off", placeholder: settings.keyConfigured ? "A key is configured · leave blank to keep it" : "Enter your OpenAI API key", spellcheck: "false" });
+  const enabled = element("input", { type: "checkbox", name: "enabled", id: "ai-enabled" });
+  enabled.checked = settings.enabled === true;
+  const automatic = element("input", { type: "checkbox", name: "automaticReview", id: "ai-automatic-review" });
+  automatic.checked = settings.automaticReview === true;
+  const budget = element("input", { type: "number", name: "monthlyBudgetUSD", id: "ai-budget", min: 0, max: 1000, step: "0.01", value: settings.monthlyBudgetUSD ?? 0, required: "" });
+  const errorNode = element("p", { class: "form-error", role: "alert", hidden: "" });
+  const save = element("button", { type: "submit", class: "primary", text: "Save AI settings" });
+  const remove = button("Remove API key", async event => {
+    const target = event.currentTarget;
+    target.disabled = true;
+    try {
+      await api("/api/ai/settings", { apiKey: null }, "PATCH");
+      key.value = "";
+      await readAiSettings();
+      notify("API key removed. Optional AI features are unavailable.");
+      if (currentView === "settings") await render();
+    } catch (error) {
+      errorNode.textContent = error.message;
+      errorNode.hidden = false;
+      target.disabled = false;
+    }
+  });
+  remove.disabled = !settings.keyConfigured;
+  form.append(element("label", { class: "checkbox-label" }, enabled,
+    element("span", { text: "Enable optional OpenAI assistance" })),
+    element("label", {}, "OpenAI API key", key),
+    element("p", { class: "form-help", text: "The key is stored in an owner-private local file on this computer. It is never sent back to this browser or included in workspace exports. Saving a key makes no API call." }),
+    element("label", {}, "Monthly app allowance (USD)", budget),
+    element("p", { class: "form-help", text: "Default $0 keeps AI unavailable. This is FPVBench’s conservative local estimate for the UTC calendar month, not your provider balance or an account-wide spending cap." }),
+    element("label", { class: "checkbox-label" }, automatic,
+      element("span", {}, "Automatically review newly imported Betaflight setups",
+        element("small", { text: "Opt in to one billed analysis after an import when AI is available. Importing still succeeds if analysis fails; there are no automatic retries." }))),
+    element("div", { class: "ai-consent" }, element("h3", { text: "What leaves this computer" }),
+      element("p", { text: "Setup analysis sends selected tuning, rate, filter, and protocol settings plus your optional goal question to OpenAI. Flight recaps send aggregate measurements and aircraft labels. Exact coordinates, locations, notes, media references, serials, and original files are excluded." }),
+      element("p", { text: "Advice explains existing evidence and may require verification. FPVBench does not generate or apply controller configurations." })),
+    errorNode, element("div", { class: "form-actions" }, remove, save));
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    errorNode.hidden = true;
+    save.disabled = true;
+    const payload = { enabled: enabled.checked, automaticReview: automatic.checked, monthlyBudgetUSD: Number(budget.value) };
+    if (key.value.trim()) payload.apiKey = key.value.trim();
+    try {
+      await api("/api/ai/settings", payload, "PATCH");
+      key.value = "";
+      await readAiSettings();
+      notify("AI settings saved. Saving does not make a billed API call.");
+      if (currentView === "settings") await render();
+    } catch (error) {
+      errorNode.textContent = error.message;
+      errorNode.hidden = false;
+      save.disabled = false;
+    }
+  });
+  const check = button("Test connection · small billed API call", async event => {
+    const target = event.currentTarget;
+    target.disabled = true;
+    target.textContent = "Testing connection…";
+    try {
+      await aiAction("/api/ai/check", {});
+      notify("Connection test completed. Availability reflects the latest verified result.");
+    } catch (error) { notify(error.message, true); }
+    if (currentView === "settings") await render();
+  });
+  check.id = "ai-check-connection";
+  check.disabled = !settings.keyConfigured || !settings.enabled || !(settings.remainingUSD > 0);
+  const status = element("section", { class: "panel" }, panelHeading("Availability and allowance", "No API call runs when you open this page."),
+    element("div", { class: "metadata" }, badge((settings.billingState || "unverified").toUpperCase(), settings.available ? "green" : "amber"),
+      badge(settings.keyConfigured ? "KEY CONFIGURED" : "NO KEY")),
+    element("p", { id: "ai-availability-reason", class: "notes", text: settings.reason || "Configure a key, enable AI, set a positive allowance, and explicitly test the connection." }),
+    element("div", { class: "stats" }, stat("Allowance", money(settings.monthlyBudgetUSD), "App allowance this UTC month"),
+      stat("Estimated usage", money(settings.spentUSD), "Includes uncertain-charge reservations"),
+      stat("Remaining", money(settings.remainingUSD), "Conservative local estimate")),
+    element("p", { class: "form-help", text: settings.verifiedAt ? `Last successful verification: ${date(settings.verifiedAt, true)}. This does not establish your current account balance.` : "The API account has not been verified. A successful explicit connection test is required." }),
+    check,
+    element("p", { class: "form-help", text: `Model: ${settings.model || "Not available"}${settings.priceCheckedAt ? ` · Pricing checked ${settings.priceCheckedAt}` : ""}. Checks and analyses use the configured monthly allowance.` }));
+  panel.append(form);
+  content.replaceChildren(panel, status);
+}
+
+function aiReportContent(envelope) {
+  const report = envelope?.report ?? envelope?.result?.report ?? envelope?.result ?? envelope;
+  const output = element("div", { class: "ai-report" });
+  if (!report || typeof report.summary !== "string") return output;
+  output.append(element("p", { class: "ai-disclosure", text: "AI-generated explanation · verify against your setup and the referenced documentation." }));
+  const context = envelope.context ?? envelope.evidence;
+  if (context && typeof context.question === "string") {
+    if (context.question.trim()) output.append(
+      element("h3", { text: envelope.cached ? "Goal used for this saved explanation" : "Goal used for this explanation" }),
+      element("p", { class: "ai-goal", text: context.question }));
+    else output.append(element("p", { class: "proof-note", text: "General setup review · no goal question supplied." }));
+  }
+  output.append(element("p", { class: "ai-summary", text: report.summary }));
+  for (const [key, title] of [["observations", "Observations"], ["questions", "Questions to consider"], ["limitations", "Evidence limits"]]) {
+    if (Array.isArray(report[key]) && report[key].length) output.append(element("h3", { text: title }),
+      element("ul", {}, ...report[key].map(text => element("li", { text }))));
+  }
+  if (context) {
+    const snapshotId = context.snapshotId ?? context.sourceSnapshotId;
+    const baselineId = context.baselineSnapshotId ?? context.baselineId;
+    const contextLines = [];
+    if (snapshotId) contextLines.push(`Setup: ${snapshots().find(item => item.id === snapshotId)?.label || "Saved setup"}`);
+    if (baselineId) contextLines.push(`Preferred baseline: ${snapshots().find(item => item.id === baselineId)?.label || "Saved preferred baseline"}`);
+    else if (snapshotId) contextLines.push("No preferred baseline supplied");
+    if (context.snapshotImportedAt) contextLines.push(`Snapshot imported ${date(context.snapshotImportedAt, true)}`);
+    if (context.baselineImportedAt) contextLines.push(`Baseline imported ${date(context.baselineImportedAt, true)}`);
+    if (contextLines.length) output.append(element("p", { class: "proof-note", text: contextLines.join(" · ") }));
+  }
+  if (envelope.generatedAt) output.append(element("p", { class: "proof-note", text: `${envelope.cached ? "Saved explanation" : "Explanation created"} ${date(envelope.generatedAt, true)}. Opening saved evidence makes no billed call.` }));
+  const sources = envelope.sources ?? report.sources ?? [];
+  if (Array.isArray(sources) && sources.length) {
+    const list = element("ul", { class: "ai-sources" });
+    for (const source of sources) {
+      try {
+        const url = new URL(typeof source === "string" ? source : source.url ?? source.href);
+        if (url.protocol !== "https:" || url.hostname !== "betaflight.com") continue;
+        list.append(element("li", {}, element("a", { href: url.href, target: "_blank", rel: "noopener noreferrer", text: source.title ?? source.label ?? url.pathname })));
+      } catch { /* Unrecognized source links are not rendered. */ }
+    }
+    if (list.childElementCount) output.append(element("h3", { text: "Referenced documentation" }), list);
+  }
+  if (envelope.facts) {
+    output.append(element("h3", { text: "Computed facts used in this recap" }), factsContent(envelope.facts));
+  }
+  return output;
+}
+
+function factsContent(value) {
+  if (value === null) return element("span", { class: "muted", text: "Unknown" });
+  if (Array.isArray(value)) return element("ul", {}, ...value.map(item => element("li", {}, factsContent(item))));
+  if (typeof value === "object") {
+    const list = element("dl", { class: "ai-facts" });
+    for (const [key, item] of Object.entries(value)) list.append(element("div", {},
+      element("dt", { text: key.replace(/([a-z])([A-Z])/g, "$1 $2") }), element("dd", {}, factsContent(item))));
+    return list;
+  }
+  return element("span", { text: String(value) });
+}
+
+function snapshotAiPanel(snapshot, revision) {
+  const panel = element("section", { class: "panel ai-feature", id: "ai-snapshot-review" },
+    panelHeading("AI setup explanation", "Optional billed analysis of selected existing settings and your preferred baseline."));
+  const question = element("textarea", { maxlength: 1000, rows: 2, id: "ai-goal-question", placeholder: "Optional: what flying feel or behavior would you like to understand?" });
+  const result = element("div", { "aria-live": "polite" });
+  let active = false;
+  let questionEdited = false;
+  question.addEventListener("input", () => { questionEdited = true; });
+  const review = button("Review setup with AI", async event => {
+    if (active || !aiSettings.available) return;
+    active = true;
+    const target = event.currentTarget;
+    target.disabled = true;
+    result.replaceChildren(element("p", { class: "loading", text: "Reviewing selected setup evidence…" }));
+    try {
+      const response = await aiAction("/api/ai/review", { snapshotId: snapshot.id, question: question.value });
+      if (revision === renderRevision && aiSettings.available) result.replaceChildren(aiReportContent(response));
+    } catch (error) {
+      if (revision === renderRevision && aiSettings.available) result.replaceChildren(warningBox([error.message]));
+      notify(error.message, true);
+    } finally {
+      active = false;
+      target.disabled = false;
+    }
+  }, "primary");
+  panel.append(element("label", {}, "Flying goal or question (optional)", question), review,
+    element("p", { class: "proof-note", text: "This sends selected tuning fields and your question to OpenAI. No raw export, notes, locations, or device identifiers are sent. Advice does not certify flightworthiness or apply settings." }), result);
+  const readCached = async (attempt = 0) => {
+    if (revision !== renderRevision || !aiSettings.available || active) return;
+    try {
+      const cached = await api(`/api/ai/review/${encodeURIComponent(snapshot.id)}`);
+      if (revision !== renderRevision || !aiSettings.available || active) return;
+      if (cached?.status === "pending") {
+        result.replaceChildren(element("p", { class: "loading", text: "The requested setup review is pending. Reading its status makes no billed call." }));
+        if (attempt < 24) setTimeout(() => { void readCached(attempt + 1); }, 1000);
+      } else if (cached?.status === "failed") result.replaceChildren(warningBox(["The previous optional review did not complete. No automatic retry was made. Check Settings before requesting another review."]));
+      else if (cached) {
+        if (!questionEdited && typeof cached.context?.question === "string") question.value = cached.context.question;
+        result.replaceChildren(aiReportContent(cached));
+      }
+    } catch {
+      await readAiSettings();
+    }
+  };
+  void readCached();
+  return panel;
+}
+
+function recapPanel(revision) {
+  const panel = element("section", { class: "panel ai-feature", id: "ai-flight-recap" },
+    panelHeading("A light flight recap", "AI explains computed aggregate facts across imported flight records; coverage counts remain visible."));
+  const result = element("div", { "aria-live": "polite" });
+  const recap = button("Create AI flight recap", async event => {
+    const target = event.currentTarget;
+    target.disabled = true;
+    result.replaceChildren(element("p", { class: "loading", text: "Preparing your aggregate flight recap…" }));
+    try {
+      const response = await aiAction("/api/ai/recap", {});
+      if (revision === renderRevision && aiSettings.available) result.replaceChildren(aiReportContent(response));
+    } catch (error) {
+      notify(error.message, true);
+      if (revision === renderRevision && aiSettings.available) result.replaceChildren(warningBox([error.message]));
+    } finally { target.disabled = false; }
+  }, "primary");
+  panel.append(recap, element("p", { class: "proof-note", text: "This sends aircraft labels and aggregate measurements to OpenAI, without coordinates, notes, raw telemetry, or original files. Distance describes distance flown, not range from the pilot." }), result);
+  return panel;
 }
 
 function showSessions() {

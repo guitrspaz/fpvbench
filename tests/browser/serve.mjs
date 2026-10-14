@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from '../../src/server.mjs';
 import { createBrowserStore } from './test-store.mjs';
+import { createBrowserAi } from './test-ai.mjs';
 
 // Interactive browser-tool target, always loopback with an ephemeral data directory.
 const dataDir = await mkdtemp(join(tmpdir(), 'fpvbench-interactive-browser-'));
-const server = await createServer({ dataDir, storeFactory: createBrowserStore });
+const server = await createServer({ dataDir, storeFactory: createBrowserStore, aiFactory: createBrowserAi().aiFactory });
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 console.log(`http://127.0.0.1:${server.address().port}`);
 let closing = false;

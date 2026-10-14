@@ -13,3 +13,11 @@ data/
 .workspace.lock
 .workspace-recovery.lock
 .workspace-*.tmp
+workspace.sqlite*
+workspace-v1-*.json.bak
+workspace-before-restore-*
+imports/
+.ai-config.json
+.ai-state.json
+.ai-reports.json
+.ai-write-*.tmp

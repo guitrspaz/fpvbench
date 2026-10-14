@@ -3,6 +3,8 @@
 - [Project quickstart](../README.md): start/stop the app and follow the first workflow.
 - [Betaflight imports](betaflight-imports.md): prepare exports and interpret their limits.
 - [DJI flight imports](dji-flight-imports.md): copied files, summaries, telemetry, and encryption limits.
+- [Optional AI](optional-ai.md): setup assistant, recap, API key, allowance, and privacy.
+- [v0.3 scope](scope-v0.3.md): optional OpenAI integration contract.
 - [Storage and backups](storage-and-backups.md): SQLite migration, complete exports, and local restore.
 - [Architecture](architecture.md): modules, persistence, comparison semantics, and boundaries.
 - [v0.2 scope](scope-v0.2.md): SQLite/import objects, API, evidence plan, and deferred work.

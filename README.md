@@ -2,7 +2,7 @@
 
 A local workbench for remembering FPV setups and learning from flight sessions.
 
-Import Betaflight configuration exports, preserve setup history, compare changes, and connect flight observations to the setup used. Import copied DJI flight records to fill in session details. v0.2 stores your workspace in SQLite.
+Import Betaflight configuration exports, preserve setup history, compare changes, and connect flight observations to the setup used. Import copied DJI flight records to fill in session details. v0.3 stores your workspace in SQLite and offers an optional OpenAI assistant.
 
 ## Start and stop
 
@@ -15,7 +15,7 @@ npm start
 
 Open **http://127.0.0.1:4173**. Leave the terminal running; press **Ctrl+C** in that terminal to stop the server. Start it again with `npm start`. Stored data survives a restart.
 
-The application and its assets run locally. No account or cloud service is required. The DJI decoder is a pinned runtime dependency with embedded WebAssembly.
+Core application features and assets run locally without an account or cloud service. Optional AI uses the OpenAI API when you enable it. The DJI decoder is a pinned runtime dependency with embedded WebAssembly.
 
 ## Setup workflow
 
@@ -41,6 +41,14 @@ Newer DJI records encrypt detailed telemetry. FPVBench imports the available une
 Each record also has a manual **AirData status**: not recorded, not uploaded, or uploaded. Change it after uploads you perform in AirData and filter the library by status. Existing upload history is not guessed.
 
 See [DJI flight imports](repository-docs/dji-flight-imports.md) for formats, measurements, and limits.
+
+## Optional AI
+
+Open **Settings** to add a server-held OpenAI API key, enable AI, and set a monthly FPVBench allowance. AI starts disabled with a zero allowance. A small billed connection test must succeed before AI controls appear.
+
+The setup assistant can explain explicit tuning changes relative to your preferred baseline and answer a short flying-goal question. Optional automatic reviews run after setup imports. A light flight recap explains computed facts about imported records. These features do not apply configurations to an aircraft.
+
+Missing key, no available allowance, or a billing/authentication failure disables AI features. Core imports, comparison, and recordkeeping continue to work. The local allowance is an estimate for this app rather than your provider balance. See [optional AI](repository-docs/optional-ai.md) for setup, billing, privacy, and limitations.
 
 ## Your data
 
@@ -72,7 +80,7 @@ npm run test:browser
 
 Automated checks use synthetic inputs and an injected memory repository. A separate local operational proof checks actual SQLite persistence and migration in a disposable directory. See [validation](repository-docs/validation.md).
 
-[Documentation index](repository-docs/README.md) · [Architecture](repository-docs/architecture.md) · [v0.2 scope](repository-docs/scope-v0.2.md)
+[Documentation index](repository-docs/README.md) · [Architecture](repository-docs/architecture.md) · [v0.3 scope](repository-docs/scope-v0.3.md)
 
 ## Future work
 

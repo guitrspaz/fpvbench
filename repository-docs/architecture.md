@@ -2,7 +2,7 @@
 
 ## Local application
 
-FPVBench v0.2 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly.
+FPVBench v0.3 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI requests use server-side fetch.
 
 The interface calls JSON endpoints for aircraft, setup imports/comparison, sessions, and DJI flight records. Browser local storage remembers only the selected aircraft; the server owns the data.
 
@@ -19,6 +19,11 @@ The interface calls JSON endpoints for aircraft, setup imports/comparison, sessi
 | `src/sqlite-repository.mjs` | Prepared SQLite persistence and telemetry pagination. |
 | `src/dji-import.mjs` | Bound decoding requests and validate/normalize DJI evidence. |
 | `src/dji-worker.mjs` | Isolate file decoding from the HTTP event loop. |
+| `src/ai-service.mjs` | Gate optional OpenAI requests, reserve local allowance, validate output, and cache reports. |
+| `src/ai-private-files.mjs` | Read/write owner-private credentials and AI state without following symlinks. |
+| `src/assistant.mjs` | Assemble actual setup/baseline context, cache explanations, and provide flight recaps. |
+| `src/assistant-evidence.mjs` | Filter explicit tuning fields and calculate aggregate flight facts. |
+| `src/assistant-glossary.mjs` | Supply fixed source-attributed Betaflight guidance. |
 | `src/server.mjs` | Loopback entry point, APIs, bounded input, downloads, and static assets. |
 | `src/errors.mjs` | Application errors and unsafe-object validation. |
 | `public/app.js` | Aircraft/history/comparison views, imports, and session forms. |
@@ -44,6 +49,14 @@ DJI imports supply locally available summary measurements and, where supported, 
 The server validates loopback Host headers, rejects foreign origins and cross-site requests, requires JSON for mutations, bounds file/request size, and restricts static paths. CSP limits the browser to local assets. User text renders as text, and original downloads are attachments.
 
 The app has no controller connection, serial-write implementation, imported-content shell execution, remote decoding, or media-fetch function. This local configuration has no authenticated multi-user internet-hosting layer.
+
+## Optional AI
+
+AI is disabled by default with no key and zero allowance. Settings exposes a write-only credential field and an explicitly billed connection check. Feature availability requires opt-in, a saved key, verified API access, and room for a conservative local spending reservation. Account balance is not queried. Provider billing/auth failures block AI until an explicit successful check; core features continue. Corrupt optional AI state disables only the assistant and is preserved for repair.
+
+Credentials, ledger, and bounded report cache live in `.ai-config.json`, `.ai-state.json`, and `.ai-reports.json` under the private data directory. They are excluded from the ordinary catalog export. The service serializes operations, persists a reservation before transmission, and reconciles known usage. Uncertain charges keep the reservation; no automatic retry occurs.
+
+Setup input contains only allowlisted explicit values and filtered baseline context. Flight summaries are calculated locally before being explained. Reports are advisory and never apply controller settings. Server calls the fixed OpenAI Responses endpoint with store:false, no tools, and bounded structured output. The browser calls only local APIs. See [optional AI](optional-ai.md).
 
 ## Validation seams
 

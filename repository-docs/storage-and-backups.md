@@ -45,6 +45,12 @@ If the current workspace is corrupt, retain the entire existing directory and re
 
 Do not replace `workspace.sqlite` with the downloaded JSON or overwrite the legacy `workspace.json` expecting SQLite to reread it. The restore command performs the conversion and keeps originals with their records.
 
+## Optional AI files
+
+`.ai-config.json` contains the optional server-held API key and preferences; `.ai-state.json` retains the local allowance ledger and verification state; `.ai-reports.json` caches explanations. These owner-private files are excluded from the catalog JSON export. Changing the key or restoring the catalog in the same directory does not clear the ledger. A fresh directory starts with AI disabled and no key or allowance.
+
+To preserve local AI history and settings, copy the whole data directory while the server is stopped and keep that copy private. A corrupt optional AI file leaves the core workspace usable; preserve the optional files before repairing them. See [optional AI](optional-ai.md).
+
 ## Local proof
 
 `node dev/verify-sqlite.mjs` runs an operational proof against disposable temporary data. It checks actual SQLite persistence/migration and backup/restore separately from automated checks, which use a memory repository. It does not operate on the normal personal workspace.

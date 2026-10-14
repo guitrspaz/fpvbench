@@ -92,8 +92,55 @@ export async function createServer({
   publicDir = publicDefault,
   examplesDir = examplesDefault,
   storeFactory = createStore,
+  aiFactory,
+  assistantFactory,
 } = {}) {
   const store = await storeFactory(dataDir);
+  let ai, assistant;
+  try {
+    ai = await (aiFactory ?? (await import("./ai-service.mjs")).createAiService)(dataDir);
+    assistant = await (assistantFactory ?? (await import("./assistant.mjs")).createAssistant)({ store, ai });
+  } catch {
+    try { await ai?.close(); } catch { /* Preserve core workspace availability. */ }
+    ai = unavailableAiService();
+    assistant = {
+      getSettings: ai.getSettings,
+      updateSettings: ai.updateSettings,
+      checkConnection: ai.checkConnection,
+      reviewSnapshot: ai.run,
+      getSnapshotReview: ai.run,
+      recapFlights: ai.run,
+      close: ai.close,
+    };
+  }
+  const automaticTasks = new Set();
+  const automaticReviews = new Map();
+  let closing = false;
+  let closeResourcesPromise;
+  const closeResources = () => {
+    if (!closeResourcesPromise) {
+      closing = true;
+      closeResourcesPromise = (async () => {
+        await Promise.allSettled(automaticTasks);
+        try { await assistant.close(); }
+        finally { try { await ai.close(); } finally { await store.close(); } }
+      })();
+    }
+    return closeResourcesPromise;
+  };
+  const queueAutomaticReview = snapshotId => {
+    if (closing || automaticTasks.size) return;
+    const task = Promise.resolve().then(async () => {
+      const settings = await assistant.getSettings();
+      if (settings.available && settings.automaticReview && !closing) {
+        automaticReviews.set(snapshotId, "pending");
+        if (automaticReviews.size > 100) automaticReviews.delete(automaticReviews.keys().next().value);
+        try { await assistant.reviewSnapshot(snapshotId, {}); automaticReviews.delete(snapshotId); }
+        catch { automaticReviews.set(snapshotId, "failed"); }
+      }
+    }).catch(() => {}).finally(() => automaticTasks.delete(task));
+    automaticTasks.add(task);
+  };
   const publicRoot = resolve(publicDir);
   const server = httpServer(async (req, res) => {
     res.setHeader("Content-Security-Policy", CSP);
@@ -119,6 +166,38 @@ export async function createServer({
       const match = path.match(
         /^\/api\/(aircraft|snapshots|sessions|flight-logs)\/([^/]+)(\/(?:raw|frames))?$/,
       );
+      if (path.startsWith("/api/ai/")) {
+        if (path === "/api/ai/settings" && req.method === "GET")
+          return json(res, 200, publicAiSettings(await assistant.getSettings()));
+        if (path === "/api/ai/settings" && req.method === "PATCH")
+          return json(res, 200, publicAiSettings(await assistant.updateSettings(await body(req, 16 * 1024))));
+        if (path === "/api/ai/check" && req.method === "POST") {
+          emptyAiBody(await body(req, 1024));
+          return json(res, 200, publicAiSettings(await assistant.checkConnection()));
+        }
+        const reviewMatch = path.match(/^\/api\/ai\/review\/([^/]+)$/);
+        if (reviewMatch && req.method === "GET") {
+          await requireAi(assistant);
+          const pendingStatus = automaticReviews.get(reviewMatch[1]);
+          if (pendingStatus) return json(res, 200, { status: pendingStatus });
+          return json(res, 200, await assistant.getSnapshotReview(reviewMatch[1]));
+        }
+        if (path === "/api/ai/review" && req.method === "POST") {
+          const input = await body(req, 16 * 1024);
+          if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some(key => !["snapshotId", "question"].includes(key))
+            || typeof input.snapshotId !== "string" || !input.snapshotId
+            || (input.question !== undefined && (typeof input.question !== "string" || input.question.length > 1000)))
+            throw new AppError("Provide a snapshot ID and an optional question of 1000 characters or fewer.");
+          await requireAi(assistant);
+          return json(res, 200, await assistant.reviewSnapshot(input.snapshotId, { question: input.question }));
+        }
+        if (path === "/api/ai/recap" && req.method === "POST") {
+          emptyAiBody(await body(req, 1024));
+          await requireAi(assistant);
+          return json(res, 200, await assistant.recapFlights());
+        }
+        throw new AppError("API route was not found.", 404);
+      }
       if (req.method === "GET" && path === "/api/state")
         return json(res, 200, store.getState());
       if (req.method === "GET" && path === "/api/export")
@@ -142,8 +221,11 @@ export async function createServer({
       }
       if (req.method === "POST" && path === "/api/aircraft")
         return json(res, 201, await store.createAircraft(await body(req)));
-      if (req.method === "POST" && path === "/api/snapshots")
-        return json(res, 201, await store.importSnapshot(await body(req)));
+      if (req.method === "POST" && path === "/api/snapshots") {
+        const snapshot = await store.importSnapshot(await body(req));
+        queueAutomaticReview(snapshot.id);
+        return json(res, 201, snapshot);
+      }
       if (req.method === "POST" && path === "/api/sessions")
         return json(res, 201, await store.createSession(await body(req)));
       if (req.method === "POST" && path === "/api/flight-logs") {
@@ -236,7 +318,9 @@ export async function createServer({
       if (!res.headersSent)
         json(res, status, {
           error:
-            status === 500
+            (req.url ?? "").startsWith("/api/ai/") && status !== 404
+              ? "The optional AI request could not be completed. Check Settings for availability, allowance, and connection status."
+              : status === 500
               ? "An unexpected local application error occurred."
               : error.message,
         });
@@ -249,20 +333,46 @@ export async function createServer({
   server.close = (callback) =>
     closeServer(async (error) => {
       try {
-        await store.close();
+        await closeResources();
         callback?.(error);
       } catch (closeError) {
         callback?.(closeError);
       }
     });
   server.once("error", () => {
-    void store.close().catch(() => {
+    void closeResources().catch(() => {
       console.error(
         "Unable to release the workspace lock. Inspect it while servers are stopped.",
       );
     });
   });
   return server;
+}
+
+function publicAiSettings(settings) {
+  const keys = ["provider", "model", "enabled", "keyConfigured", "monthlyBudgetUSD", "spentUSD", "remainingUSD", "automaticReview", "available", "reason", "verifiedAt", "billingState", "priceCheckedAt"];
+  return Object.fromEntries(keys.map(key => [key, settings[key]]));
+}
+
+function unavailableAiService() {
+  const reason = "AI configuration unavailable; preserve local files before repair";
+  const unavailable = () => { throw new AppError(reason, 409); };
+  return {
+    getSettings: () => ({ provider: "openai", model: "gpt-5.4-mini-2026-03-17", enabled: false, keyConfigured: false,
+      monthlyBudgetUSD: 0, spentUSD: 0, remainingUSD: 0, automaticReview: false, available: false, reason,
+      verifiedAt: null, billingState: "unverified", priceCheckedAt: "2026-10-14" }),
+    updateSettings: unavailable, checkConnection: unavailable, run: unavailable, close: async () => {},
+  };
+}
+
+function emptyAiBody(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length)
+    throw new AppError("This action accepts an empty JSON object.");
+}
+
+async function requireAi(assistant) {
+  const settings = await assistant.getSettings();
+  if (!settings.available) throw new AppError("Optional AI is unavailable. Check Settings.", 409);
 }
 
 function integerQuery(url, key, defaultValue, max, min = 0) {

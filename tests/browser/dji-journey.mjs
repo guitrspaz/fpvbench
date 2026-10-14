@@ -3,12 +3,14 @@ import { decodedDjiFixture } from '../helpers/dji-fixtures.mjs';
 /** Synthetic JSON browser journey; the server injects an in-memory repository. */
 export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   const errors = [], expectedValidationErrors = [], externalRequests = [];
-  page.on('pageerror', error => errors.push(error.message));
-  page.on('console', message => {
+  const onPageError = error => errors.push(error.message);
+  const onConsole = message => {
     if (message.type() !== 'error') return;
     if (message.location().url === baseURL + '/api/flight-logs' && /422/.test(message.text())) expectedValidationErrors.push(message.text());
     else errors.push(message.text());
-  });
+  };
+  page.on('pageerror', onPageError);
+  page.on('console', onConsole);
   await page.route('**/*', route => {
     if (new URL(route.request().url()).origin === new URL(baseURL).origin) return route.continue();
     externalRequests.push(route.request().url());
@@ -143,5 +145,7 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   }
   expect(errors).toEqual([]);
   expect(externalRequests).toEqual([]);
+  page.off('pageerror', onPageError);
+  page.off('console', onConsole);
   return { passed: ['multi-file JSON upload', 'partial batch retains successes', 'summary-only and decoded labels', 'summary metrics', 'exact original downloads', 'telemetry pagination', 'renamed-file deduplication', 'metadata-created unconfirmed session', 'imported link survives edit/reload', 'AirData status/filter survives dedupe and session edit/reload', 'mobile views and telemetry', 'no unexpected browser errors', 'no external requests'], errors, expectedValidationErrors };
 }

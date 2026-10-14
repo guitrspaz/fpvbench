@@ -10,7 +10,7 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-The runner creates an isolated local temporary workspace, injects a synthetic in-memory repository without opening SQLite, starts the real application on an ephemeral `127.0.0.1` port, and launches one headless Chromium browser. Its `finally` block closes the browser and server and removes the workspace. It never uses the normal personal data directory or connects to a controller.
+The runner creates an isolated local temporary workspace, injects a synthetic in-memory repository without opening SQLite, starts the real application on an ephemeral `127.0.0.1` port, and launches one headless Chromium browser. Its `finally` block closes the browser and server and removes the workspace. It never uses the normal personal data directory or connects to a controller. The v0.3 runner injects a fake Responses provider through aiFactory. All keys, reports, and provider failures are synthetic; no live OpenAI call is made.
 
 The repository provides Playwright as a development dependency. For a machine that already has a suitable browser executable, set `FPVBENCH_CHROMIUM` to its absolute path. `FPVBENCH_PLAYWRIGHT_DIR` optionally points to an existing Playwright package directory; leave it unset to use the repository installation. No package is downloaded by the runner itself.
 
@@ -22,7 +22,38 @@ FPVBENCH_SCREENSHOT_DIR=/absolute/local/screenshot-directory npm run test:browse
 
 The runner also accepts --screenshot-dir=/absolute/local/directory as a command-line argument. Screenshots contain synthetic test data and are not added to the repository automatically.
 
-## Observed result — v0.2, 2026-10-14
+## Observed result — v0.3, 2026-10-14
+
+All 41 browser checks passed: the existing 26 setup/session/DJI/AirData checks plus 15 optional-AI checks. The run used Node.js 26.5.0, repository-installed Playwright 1.64.0, and Chromium 149.0.7827.55. Browser test ESLint passed. Desktop was 1440 × 1000; mobile was 390 × 844.
+
+The actual AI service, ledger, cache, assistant context, API, and interface ran with an injected fake fetch implementation. It returned strict synthetic Responses results or a controlled insufficient_quota rejection. Scenario changes use an in-process fixture function, with no unsecured test HTTP routes. The setup/flight catalog still used the synthetic memory repository; no SQLite file was created.
+
+| AI check | Observed result |
+|---|---|
+| Empty-workspace Settings | Settings usable before aircraft creation; defaults disabled, no key, allowance zero |
+| Default behavior | Review and recap actions absent; all existing 26 checks made zero provider requests |
+| Configure key | Saving a synthetic credential cleared the password field immediately and made no provider call |
+| Credential privacy | Credential absent from settings/state/core export, visible page text, and localStorage |
+| Explicit check | Clearly billed check action made exactly one fake request and enabled AI availability |
+| Setup explanation | Nonempty goal question, explanation sections, fixed Betaflight links, and selected baseline/source labels rendered |
+| Evidence trace | Cached API response contained the exact source snapshot ID and a SHA-256 evidence fingerprint |
+| Cached goal review | Reopening the snapshot displayed the saved goal-specific explanation without another request |
+| Aggregate recap | Explanation and computed facts appeared together |
+| Automatic review | Opted-in import produced one review; reopening its cache made no new request |
+| Quota rejection | AI actions/content disappeared; Settings showed blocked billing; no synthetic credential leaked |
+| Offline behavior | Another Betaflight import succeeded while billing remained blocked, without a provider request |
+| Explicit recovery | A successful fake connection recheck restored availability and cached content |
+| Zero allowance | Setting allowance to zero hid new actions and cached content without another request |
+| Mobile | Settings had no document-level horizontal overflow at 390 pixels |
+| Diagnostics/network | No unexpected console errors, page exceptions, or external browser requests |
+
+The complete run made six fake provider requests: initial verification, goal review, recap, automatic review, quota-rejected review, and explicit recovery verification. It made zero live API calls. The existing malformed DJI upload generated its expected 422 browser network diagnostic, and the simulated AI billing rejection generated its expected 409 diagnostic; both are recorded separately from unexpected errors.
+
+Synthetic AI review and mobile Settings screenshots were generated outside the tracked tree and inspected. This proves interface wiring with a fake provider, not live model quality, actual OpenAI billing/balance, or provider-account compatibility. Key/ledger/report file I/O remained local and disposable. Real SQLite and restart evidence remains in the separately invoked operational proof in [validation.md](validation.md). See [scope-v0.3.md](scope-v0.3.md) for the current boundary.
+
+MCP_DOCKER was tried first but returned ERR_CONNECTION_REFUSED for the loopback target. The server remained loopback-only; approved local Chromium completed the proof. No browser test processes remained after cleanup.
+
+## Historical result — v0.2, 2026-10-14
 
 The existing setup/session workflow and DJI journey passed: 13 existing checks plus 13 DJI/AirData checks. The run used Node.js 26.5.0, repository-installed Playwright 1.64.0, and cached Chromium 149.0.7827.55. Browser test ESLint passed. Desktop was 1440 × 1000; mobile was 390 × 844.
 
