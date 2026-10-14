@@ -36,10 +36,10 @@ beforeEach(async () => {
 afterEach(async () => { await new Promise(resolve => server.close(resolve)); await rm(directory, { recursive: true, force: true }); });
 
 test('settings remain readable while offline; server rejects bypass attempts without making calls', async () => {
-  const { snapshot } = await seed();
+  const { aircraft, snapshot } = await seed();
   const settings = await (await request('/api/ai/settings')).json();
   expect(settings).toMatchObject({ enabled: false, keyConfigured: false, automaticReview: false, monthlyBudgetUSD: 0, available: false });
-  for (const response of [await request('/api/ai/review', { snapshotId: snapshot.id }), await request(`/api/ai/review/${snapshot.id}`), await request('/api/ai/recap', {})])
+  for (const response of [await request('/api/ai/review', { snapshotId: snapshot.id }), await request(`/api/ai/review/${snapshot.id}`), await request('/api/ai/recap', { aircraftId: aircraft.id })])
     expect([403, 409]).toContain(response.status);
   expect((await request('/api/ai/check', {})).status).toBe(403);
   expect(fetchImpl).not.toHaveBeenCalled();
@@ -83,16 +83,25 @@ test('flight recap returns computed facts and respects origin and input boundari
   const { aircraft, snapshot } = await seed();
   await request('/api/sessions', { aircraftId: aircraft.id, title: 'Synthetic flight', flownAt: '2026-10-14T12:00:00Z', durationMinutes: 2, notes: 'PRIVATE SESSION NOTES', location: 'PRIVATE LOCATION' });
   await enable();
-  const recap = await request('/api/ai/recap', {});
+  const other = await (await request('/api/aircraft', { name: 'Other private aircraft' })).json();
+  await request('/api/sessions', { aircraftId: other.id, title: 'Other flight', flownAt: '2026-10-14T13:00:00Z', durationMinutes: 100 });
+  const recap = await request('/api/ai/recap', { aircraftId: aircraft.id });
   expect(recap.status).toBe(200);
-  expect((await recap.json()).facts.flightCount).toBe(1);
+  const report = await recap.json();
+  expect(report.context.aircraftId).toBe(aircraft.id);
+  expect(report.facts.flightCount).toBe(1);
+  expect(report.facts.durationSeconds.value).toBe(120);
   const providerBody = fetchImpl.mock.calls[1][1].body;
+  expect(providerBody).not.toContain(aircraft.id);
+  expect(providerBody).not.toContain('Other private aircraft');
   expect(providerBody).not.toContain('PRIVATE LOCATION');
   expect(providerBody).not.toContain('PRIVATE SESSION NOTES');
   expect((await request('/api/ai/check', {}, 'POST', { Origin: 'https://other.example' })).status).toBe(403);
   expect((await request('/api/ai/review', { snapshotId: snapshot.id, question: 'x'.repeat(1001) })).status).toBe(400);
   expect((await request('/api/ai/review', { snapshotId: snapshot.id, rawText })).status).toBe(400);
-  expect((await request('/api/ai/recap', { apiKey: credential })).status).toBe(400);
+  for (const input of [{}, null, [], { aircraftId: '' }, { aircraftId: 42 }, { aircraftId: aircraft.id, apiKey: credential }])
+    expect((await request('/api/ai/recap', input)).status).toBe(400);
+  expect((await request('/api/ai/recap', { aircraftId: 'missing' })).status).toBe(404);
   expect((await request('/api/ai/settings', { provider: 'other' }, 'PATCH')).status).toBe(400);
   expect(fetchImpl).toHaveBeenCalledTimes(2);
 });

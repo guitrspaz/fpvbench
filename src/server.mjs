@@ -192,9 +192,12 @@ export async function createServer({
           return json(res, 200, await assistant.reviewSnapshot(input.snapshotId, { question: input.question }));
         }
         if (path === "/api/ai/recap" && req.method === "POST") {
-          emptyAiBody(await body(req, 1024));
+          const input = await body(req, 1024);
+          if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some(key => key !== "aircraftId")
+            || typeof input.aircraftId !== "string" || !input.aircraftId.trim())
+            throw new AppError("Provide the selected aircraft ID.");
           await requireAi(assistant);
-          return json(res, 200, await assistant.recapFlights());
+          return json(res, 200, await assistant.recapFlights(input.aircraftId));
         }
         throw new AppError("API route was not found.", 404);
       }

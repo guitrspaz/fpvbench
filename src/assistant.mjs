@@ -72,11 +72,17 @@ export function createAssistant({ store, ai }) {
       const report = await ai.findReport(report => report.kind === 'snapshot-review' && report.evidenceFingerprint === evidenceFingerprint);
       return report ? { ...report, cached: true } : null;
     },
-    async recapFlights() {
-      const facts = flightFacts(store.getState());
-      if (!facts.flightCount) throw new AppError('Import a flight record or create a session before requesting a recap.');
-      const payload = { task: 'Explain only these computed aggregate facts about records in FPVBench. State measurement coverage and inventory limits. Do not infer locations, risk, causes or setup performance.', facts, constraints };
-      return analyze('flight-recap', payload, { coverage: 'FPVBench records only' }, keyFor('flight-recap', payload), [], facts);
+    async recapFlights(aircraftId) {
+      if (typeof aircraftId !== 'string' || !aircraftId.trim()) throw new AppError('Provide the selected aircraft ID.');
+      const state = store.getState();
+      const aircraft = state.aircraft.find(record => record.id === aircraftId);
+      if (!aircraft) throw new AppError('Aircraft was not found.', 404);
+      const facts = flightFacts({ aircraft: [aircraft], flightLogs: state.flightLogs.filter(log => log.aircraftId === aircraftId), sessions: state.sessions.filter(session => session.aircraftId === aircraftId) });
+      if (!facts.flightCount) throw new AppError('Import a flight record or create a session for this aircraft before requesting a recap.');
+      const payload = { task: 'Explain only these computed aggregate facts about the selected aircraft records in FPVBench. State measurement coverage and inventory limits. Do not infer locations, risk, causes or setup performance.', facts, constraints };
+      const context = { aircraftId, aircraftLabel: aircraft.name.slice(0, 80), coverage: 'Selected aircraft records in FPVBench only' };
+      // Aircraft identity isolates local caches without transmitting the ID to OpenAI.
+      return analyze('flight-recap', payload, context, keyFor('flight-recap', { aircraftId, payload }), [], facts);
     },
     async close() { closed = true; await Promise.allSettled([...pending.values()]); await ai.close(); },
   };

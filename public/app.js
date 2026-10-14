@@ -968,7 +968,7 @@ function showSettings() {
       element("span", {}, "Automatically review newly imported Betaflight setups",
         element("small", { text: "Opt in to one billed analysis after an import when AI is available. Importing still succeeds if analysis fails; there are no automatic retries." }))),
     element("div", { class: "ai-consent" }, element("h3", { text: "What leaves this computer" }),
-      element("p", { text: "Setup analysis sends selected tuning, rate, filter, and protocol settings plus your optional goal question to OpenAI. Flight recaps send aggregate measurements and aircraft labels. Exact coordinates, locations, notes, media references, registration IDs, serial numbers, and original files are excluded." }),
+      element("p", { text: "Setup analysis sends selected tuning, rate, filter, and protocol settings plus your optional goal question to OpenAI. Flight recaps send aggregate measurements and the selected aircraft's label. Exact coordinates, locations, notes, media references, registration IDs, serial numbers, and original files are excluded." }),
       element("p", { text: "Advice explains existing evidence and may require verification. FPVBench does not generate or apply controller configurations." })),
     errorNode, element("div", { class: "form-actions" }, remove, save));
   form.addEventListener("submit", async event => {
@@ -1036,6 +1036,7 @@ function aiReportContent(envelope) {
     const snapshotId = context.snapshotId ?? context.sourceSnapshotId;
     const baselineId = context.baselineSnapshotId ?? context.baselineId;
     const contextLines = [];
+    if (context.aircraftId) contextLines.push(`Aircraft: ${context.aircraftLabel || "Selected aircraft"}`);
     if (snapshotId) contextLines.push(`Setup: ${snapshots().find(item => item.id === snapshotId)?.label || "Saved setup"}`);
     if (baselineId) contextLines.push(`Preferred baseline: ${snapshots().find(item => item.id === baselineId)?.label || "Saved preferred baseline"}`);
     else if (snapshotId) contextLines.push("No preferred baseline supplied");
@@ -1123,22 +1124,24 @@ function snapshotAiPanel(snapshot, revision) {
 }
 
 function recapPanel(revision) {
+  const aircraft = selectedAircraft();
+  const recapAircraftId = aircraft.id;
   const panel = element("section", { class: "panel ai-feature", id: "ai-flight-recap" },
-    panelHeading("A light flight recap", "AI explains computed aggregate facts across imported flight records; coverage counts remain visible."));
+    panelHeading("A light flight recap", `For ${aircraft.name}. AI explains computed facts from this aircraft’s imported logs and manual sessions only; coverage counts remain visible.`));
   const result = element("div", { "aria-live": "polite" });
   const recap = button("Create AI flight recap", async event => {
     const target = event.currentTarget;
     target.disabled = true;
-    result.replaceChildren(element("p", { class: "loading", text: "Preparing your aggregate flight recap…" }));
+    result.replaceChildren(element("p", { class: "loading", text: `Preparing the flight recap for ${aircraft.name}…` }));
     try {
-      const response = await aiAction("/api/ai/recap", {});
-      if (revision === renderRevision && aiSettings.available) result.replaceChildren(aiReportContent(response));
+      const response = await aiAction("/api/ai/recap", { aircraftId: recapAircraftId });
+      if (revision === renderRevision && aircraftId === recapAircraftId && aiSettings.available) result.replaceChildren(aiReportContent(response));
     } catch (error) {
       notify(error.message, true);
-      if (revision === renderRevision && aiSettings.available) result.replaceChildren(warningBox([error.message]));
+      if (revision === renderRevision && aircraftId === recapAircraftId && aiSettings.available) result.replaceChildren(warningBox([error.message]));
     } finally { target.disabled = false; }
   }, "primary");
-  panel.append(recap, element("p", { class: "proof-note", text: "This sends aircraft labels and aggregate measurements to OpenAI, without coordinates, notes, raw telemetry, or original files. Distance describes distance flown, not range from the pilot." }), result);
+  panel.append(recap, element("p", { class: "proof-note", text: "This sends only the selected aircraft’s label and aggregate measurements to OpenAI, without coordinates, notes, raw telemetry, or original files. Distance describes distance flown, not range from the pilot." }), result);
   return panel;
 }
 

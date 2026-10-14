@@ -107,25 +107,56 @@ test('recap facts avoid linked-session duplicates, preserve zero/missing coverag
   Object.assign(state.aircraft[0], { registrationId: 'PRIVATE_REGISTRATION', serialNumber: 'PRIVATE_SERIAL' });
   state.flightLogs = [
     { id: 'log-a', aircraftId: 'quad-a', rawText: 'PRIVATE_RAW', filename: 'SECRET_FILE', summary: { durationSeconds: 60, distanceMeters: 100, maxHeightMeters: 30, location: 'PRIVATE_LOCATION', startCoordinate: { lat: 12, lon: 34 } } },
-    { id: 'log-b', aircraftId: 'quad-b', summary: { durationSeconds: 0, distanceMeters: null, maxHeightMeters: 0 } },
+    { id: 'log-b', aircraftId: 'quad-a', summary: { durationSeconds: 0, distanceMeters: null, maxHeightMeters: 0 } },
   ];
+  state.flightLogs.push({ id: 'outside', aircraftId: 'quad-b', summary: { durationSeconds: 900, distanceMeters: 9999, maxHeightMeters: 500 } }, { id: 'inbox', aircraftId: null, summary: { durationSeconds: 900, distanceMeters: 9999, maxHeightMeters: 500 } });
   state.sessions = [{ aircraftId: 'quad-a', flightLogId: 'log-a', durationMinutes: 1, notes: 'PRIVATE_NOTES' }, { aircraftId: 'quad-a', flightLogId: null, durationMinutes: 2, location: 'PRIVATE_LOCATION' }];
-  const report = await assistant.recapFlights();
+  state.sessions.push({ aircraftId: 'quad-b', flightLogId: null, durationMinutes: 900 });
+  state.aircraft[0].status = 'retired';
+  const report = await assistant.recapFlights('quad-a');
+  expect(report.context.aircraftId).toBe('quad-a');
+  expect(report.facts.unassignedFlightCount).toBe(0);
   expect(report.facts.flightCount).toBe(3);
   expect(report.facts.durationSeconds).toEqual({ value: 180, coveredFlights: 3, totalFlights: 3 });
   expect(report.facts.distanceFlownMeters).toEqual({ value: 100, coveredFlights: 1, totalFlights: 3 });
   expect(report.facts.highestRecordedHeightMeters.coveredFlights).toBe(2);
-  expect(report.facts.aircraft[0]).toEqual({ label: 'Test aircraft', flightCount: 2 });
+  expect(report.facts.aircraft).toEqual([{ label: 'Test aircraft', flightCount: 3 }]);
   const sent = JSON.stringify(ai.run.mock.calls[0][1]);
-  for (const secret of ['PRIVATE', 'SECRET', '"lat":', '"lon":', 'log-a']) expect(sent).not.toContain(secret);
-  expect((await assistant.recapFlights()).cached).toBe(true);
+  for (const secret of ['PRIVATE', 'SECRET', '"lat":', '"lon":', 'log-a', 'quad-a', 'quad-b', 'Other aircraft', '9999']) expect(sent).not.toContain(secret);
+  expect((await assistant.recapFlights('quad-a')).cached).toBe(true);
   expect(ai.run).toHaveBeenCalledTimes(1);
   expect(report.facts.limitations.join(' ')).toMatch(/not distance from the pilot/);
 });
 
+test('recap rejects missing or unknown aircraft without provider calls', async () => {
+  const { assistant, ai, state } = harness();
+  state.sessions.push({ aircraftId: 'quad-b', flightLogId: null, durationMinutes: 10 });
+  for (const id of [undefined, null, '', 42]) await expect(assistant.recapFlights(id)).rejects.toMatchObject({ status: 400 });
+  await expect(assistant.recapFlights('missing')).rejects.toMatchObject({ status: 404 });
+  await expect(assistant.recapFlights('quad-a')).rejects.toMatchObject({ status: 400 });
+  expect(ai.run).not.toHaveBeenCalled();
+});
+
+test('recap caches stay separate for identical aircraft labels and facts; unrelated changes keep the selected cache', async () => {
+  const { assistant, ai, state } = harness();
+  state.aircraft[1].name = state.aircraft[0].name;
+  state.sessions = ['quad-a', 'quad-b'].map(aircraftId => ({ aircraftId, flightLogId: null, durationMinutes: 2 }));
+  const first = await assistant.recapFlights('quad-a');
+  const other = await assistant.recapFlights('quad-b');
+  expect(other.fingerprint).not.toBe(first.fingerprint);
+  expect(other.context.aircraftId).toBe('quad-b');
+  expect(ai.run).toHaveBeenCalledTimes(2);
+  state.sessions[1].durationMinutes = 9;
+  expect((await assistant.recapFlights('quad-a')).cached).toBe(true);
+  expect(ai.run).toHaveBeenCalledTimes(2);
+  state.sessions[0].durationMinutes = 3;
+  expect((await assistant.recapFlights('quad-a')).cached).toBe(false);
+  expect(ai.run).toHaveBeenCalledTimes(3);
+});
+
 test('empty recap does not call provider; aggregates large catalogs without argument overflow', async () => {
   const { assistant, ai } = harness();
-  await expect(assistant.recapFlights()).rejects.toMatchObject({ status: 400 });
+  await expect(assistant.recapFlights('quad-a')).rejects.toMatchObject({ status: 400 });
   expect(ai.run).not.toHaveBeenCalled();
   const facts = flightFacts({ aircraft: [], sessions: [], flightLogs: Array.from({ length: 150000 }, () => ({ aircraftId: 'missing', summary: { durationSeconds: null, distanceMeters: 0, maxHeightMeters: 0 } })) });
   expect(facts.longestDistanceFlownMeters.value).toBe(0);
@@ -148,7 +179,7 @@ test('fresh responses return the credential-redacted saved record for local cont
   expect(JSON.stringify(review)).not.toContain('test-credential');
   state.aircraft[0].name = 'test-credential';
   state.sessions.push({ aircraftId: 'quad-a', flightLogId: null, durationMinutes: 1 });
-  const recap = await assistant.recapFlights();
+  const recap = await assistant.recapFlights('quad-a');
   expect(recap.facts.aircraft[0].label).toBe('[redacted]');
   expect(JSON.stringify(recap)).not.toContain('test-credential');
 });

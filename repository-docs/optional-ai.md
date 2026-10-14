@@ -18,7 +18,9 @@ Missing key, disabled AI, insufficient local allowance, or an unverified/blocked
 
 The **setup assistant** explains explicit tuning settings and differences from the selected aircraft's preferred baseline. You can supply a short flying-goal question. Automatic review is separately opt-in and runs only after a successful setup import; a failed analysis never undoes the import.
 
-The **flight recap** explains facts computed by ordinary application code: imported flight counts, available durations/distances/heights, and counts by aircraft. Coverage counts show missing measurements. Distance means distance flown, not distance from the pilot. This is a light recap of the imported library, not a replacement for AirData's analysis.
+The **flight recap** on the overview uses only the **currently selected aircraft**: its imported logs and manual sessions. Ordinary application code computes counts and available durations/distances/heights, avoiding double-counting sessions linked to imported logs. Other aircraft and unassigned records are excluded. Coverage counts show missing measurements. Distance means distance flown, not distance from the pilot. An aircraft with no records cannot generate a recap. This remains a light summary alongside AirData.
+
+The panel names its aircraft. Switching aircraft clears the displayed recap and does not make a billed request; choose **Create AI flight recap** to generate or retrieve one for the new selection. Retired aircraft can still be selected through the fleet filter and recapped. Requests require the selected aircraft ID (`POST /api/ai/recap` with `{ aircraftId }`); the local ID is not sent to OpenAI.
 
 Advice does not establish flightworthiness or generate/apply a controller configuration. Betaflight baseline preferences are user selections, not independently validated tunes. Sparse exports and unfamiliar firmware remain limitations. DJI flight logs do not supply Betaflight-style configuration evidence.
 
@@ -36,7 +38,7 @@ Primary references: [model and pricing](https://developers.openai.com/api/docs/m
 
 Setup review sends a bounded selection of explicit tuning/rates/filter/protocol fields, firmware/profile context, a similarly filtered baseline comparison, your optional question, and a small source glossary. It excludes the original configuration text and unrelated configuration fields.
 
-Flight recap sends aggregate measurements and aircraft labels. User-entered labels and your question are included, so choose what you want to share. Exact coordinates, locations, original files, component identifiers, session notes, footage references, and raw telemetry are excluded.
+Flight recap sends only the selected aircraft's aggregate measurements and label. User-entered labels and your question are included, so choose what you want to share. Exact coordinates, locations, original files, component identifiers, session notes, footage references, and raw telemetry are excluded.
 
 Requests go from the local server to the fixed OpenAI Responses endpoint, with `store: false`. No web-search tool, remote decoding, controller operation, or AirData submission is involved. Setting `store: false` controls response storage; it is not a promise of zero provider retention. See [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data).
 
@@ -45,6 +47,8 @@ Requests go from the local server to the fixed OpenAI Responses endpoint, with `
 The key is stored only by the local server in `.ai-config.json`, an owner-private file outside the repository. The ledger and cache use `.ai-state.json` and `.ai-reports.json`. Keep any custom data directory outside the source checkout; the default workspace is already outside it. The settings response provides only whether a key exists; the field is never populated with a saved key. The app does not put credentials in browser storage, workspace exports, model inputs, or diagnostic logs.
 
 Local AI configuration, spending ledger, and cached reports are separate from the flight/setup catalog and excluded from its JSON export. To preserve those local files, copy the complete data directory while FPVBench is stopped and keep that copy private. The ordinary export remains complete for aircraft, setups, sessions, DJI originals, and telemetry.
+
+Flight recap caches are separate for each aircraft and its computed facts. Unchanged facts reuse that aircraft's report; changes elsewhere in the fleet do not invalidate it. Older whole-workspace recaps are not reused.
 
 Repeated reviews of unchanged evidence and the same question reuse the cached report. Opening a setup retrieves its latest matching saved goal-specific review; changing the baseline or source evidence invalidates that match. Opening a saved report does not make an API request; AI content remains hidden when availability is disabled.
 

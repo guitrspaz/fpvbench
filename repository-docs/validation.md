@@ -25,7 +25,13 @@ node dev/verify-ai.mjs
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.4.2 results — 2026-10-14
+## Observed v0.4.3 results — 2026-10-14
+
+- 123 Jest tests passed across ten suites; ESLint passed. Recap checks cover selected-aircraft imported/manual history, linked-session deduplication, exclusion of other aircraft and inbox records, empty/invalid selection without provider calls, aggregate privacy, and separate caches even for identical labels and facts.
+- 69 browser checks passed with synthetic records, memory repositories, and a fake AI provider. New checks verify the selected recap evidence, clearing the report when switching aircraft, per-aircraft cache reuse, and ignoring a late response after switching. The full run made seven fake provider calls and no real paid requests.
+- Existing workspace records and optional AI configuration were not changed.
+
+## Historical v0.4.2 results — 2026-10-14
 
 - 121 Jest tests passed across ten suites; ESLint passed. New checks cover default and legacy status, invalid-input atomicity, retirement/reactivation, preserved setup and flight history, API/export status, and retired-aircraft serial routing.
 - 65 browser checks passed using synthetic records, memory repositories, and a fake AI provider. Lifecycle checks cover active-fleet exclusion, retired history access, remembered filters, status labels, reactivation, empty filtered views, and mobile overflow. No unexpected browser errors occurred.
