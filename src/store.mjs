@@ -1,445 +1,204 @@
-import {
-  mkdir,
-  readFile,
-  writeFile,
-  rename,
-  unlink,
-  open,
-} from "node:fs/promises";
-import { join } from "node:path";
-import { randomUUID, createHash } from "node:crypto";
-import { AppError, assertSafeObject, containsControlText } from "./errors.mjs";
-import { parseExport } from "./parser.mjs";
-import { summarizeSnapshot } from "./compare.mjs";
+import { mkdir, readFile, writeFile, unlink, lstat, open } from 'node:fs/promises';
+import { join } from 'node:path';
+import { randomUUID, createHash } from 'node:crypto';
+import { AppError } from './errors.mjs';
+import { parseExport } from './parser.mjs';
+import { summarizeSnapshot } from './compare.mjs';
+import { acquireLock } from './workspace-lock.mjs';
+import { aircraftFields, sessionFields, objectInput, textField, getRecord, validateAircraft, validateSession, validateWorkspace, validateFlightLog, validateFrames } from './workspace-validation.mjs';
 
-const aircraftFields = ["name", "kind", "notes", "baselineSnapshotId"];
-const sessionFields = [
-  "aircraftId",
-  "snapshotId",
-  "title",
-  "flownAt",
-  "location",
-  "durationMinutes",
-  "battery",
-  "props",
-  "conditions",
-  "notes",
-  "outcome",
-  "mediaRefs",
-  "confirmedSetup",
-];
-const hash = (text) => createHash("sha256").update(text, "utf8").digest("hex");
-const copy = (object) => structuredClone(object);
+const copy = value => structuredClone(value);
+const hash = value => createHash('sha256').update(value).digest('hex');
 const timestamp = () => new Date().toISOString();
+export const MAX_FLIGHT_BYTES = 25 * 1024 * 1024;
 
-function objectInput(input, allowed) {
-  assertSafeObject(input);
-  if (!input || typeof input !== "object" || Array.isArray(input))
-    throw new AppError("A JSON object is required.");
-  for (const key of Object.keys(input))
-    if (!allowed.includes(key))
-      throw new AppError(`Unsupported field: ${key}.`);
-}
-function textField(value, field, { required = false, max = 10000 } = {}) {
-  if (
-    typeof value !== "string" ||
-    value.length > max ||
-    containsControlText(value)
-  )
-    throw new AppError(`${field} must be text of at most ${max} characters.`);
-  if (required && !value.trim()) throw new AppError(`${field} is required.`);
-  return value;
-}
-function isoDate(value, field) {
-  if (
-    typeof value !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(
-      value,
-    ) ||
-    !Number.isFinite(Date.parse(value))
-  )
-    throw new AppError(
-      `${field} must be an ISO date and time with a timezone.`,
-    );
-  // Date.parse normalizes February 30: reject invalid calendar days explicitly.
-  const [, year, month, day] = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (
-    Number(month) < 1 ||
-    Number(month) > 12 ||
-    Number(day) < 1 ||
-    Number(day) >
-      new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
-  )
-    throw new AppError(`${field} contains an invalid date.`);
-  return value;
-}
-function identifier(value) {
-  return (
-    typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      value,
-    )
-  );
-}
-function getRecord(state, collection, id) {
-  const found = state[collection].find((record) => record.id === id);
-  if (!found) throw new AppError("The requested record was not found.", 404);
-  return found;
-}
-function snapshotRelationship(state, aircraftId, snapshotId) {
-  getRecord(state, "aircraft", aircraftId);
-  if (snapshotId !== null) {
-    if (typeof snapshotId !== "string")
-      throw new AppError("snapshotId must be an ID or null.");
-    const snapshot = getRecord(state, "snapshots", snapshotId);
-    if (snapshot.aircraftId !== aircraftId)
-      throw new AppError("The snapshot must belong to the same aircraft.");
-  }
-}
-function validateAircraft(state, record) {
-  textField(record.name, "name", { required: true, max: 200 });
-  textField(record.kind, "kind", { max: 200 });
-  textField(record.notes, "notes");
-  snapshotRelationship(state, record.id, record.baselineSnapshotId);
-}
-function validateSession(state, record) {
-  snapshotRelationship(state, record.aircraftId, record.snapshotId);
-  textField(record.title, "title", { required: true, max: 200 });
-  isoDate(record.flownAt, "flownAt");
-  for (const field of ["location", "battery", "props", "conditions"])
-    textField(record[field], field, { max: 1000 });
-  textField(record.notes, "notes");
-  if (
-    record.durationMinutes !== null &&
-    (typeof record.durationMinutes !== "number" ||
-      !Number.isFinite(record.durationMinutes) ||
-      record.durationMinutes < 0 ||
-      record.durationMinutes > 1440)
-  )
-    throw new AppError(
-      "durationMinutes must be null or a number from 0 to 1440.",
-    );
-  if (!["unrated", "better", "same", "worse"].includes(record.outcome))
-    throw new AppError("Choose a valid outcome.");
-  if (typeof record.confirmedSetup !== "boolean")
-    throw new AppError("confirmedSetup must be a boolean.");
-  if (!Array.isArray(record.mediaRefs) || record.mediaRefs.length > 100)
-    throw new AppError(
-      "mediaRefs must be an array of at most 100 text references.",
-    );
-  record.mediaRefs.forEach((value) =>
-    textField(value, "media reference", { required: true, max: 2000 }),
-  );
-}
-function validateWorkspace(state) {
-  objectInput(state, ["version", "aircraft", "snapshots", "sessions"]);
-  if (
-    state.version !== 1 ||
-    !["aircraft", "snapshots", "sessions"].every((key) =>
-      Array.isArray(state[key]),
-    )
-  )
-    throw new Error("Unsupported workspace schema.");
-  const ids = new Set();
-  for (const collection of ["aircraft", "snapshots", "sessions"]) {
-    for (const record of state[collection]) {
-      if (!record || !identifier(record.id) || ids.has(record.id))
-        throw new Error("Invalid or duplicate record ID.");
-      ids.add(record.id);
-      isoDate(
-        collection === "snapshots" ? record.importedAt : record.createdAt,
-        "record timestamp",
-      );
-      if (collection === "aircraft") {
-        objectInput(record, ["id", ...aircraftFields, "createdAt"]);
-        validateAircraft(state, record);
-      }
-      if (collection === "sessions") {
-        objectInput(record, ["id", ...sessionFields, "createdAt"]);
-        validateSession(state, record);
-      }
-      if (collection === "snapshots") {
-        objectInput(record, [
-          "id",
-          "aircraftId",
-          "label",
-          "notes",
-          "filename",
-          "importedAt",
-          "sha256",
-          "rawText",
-          "parsed",
-        ]);
-        getRecord(state, "aircraft", record.aircraftId);
-        textField(record.label, "label", { required: true, max: 200 });
-        textField(record.notes, "notes");
-        textField(record.filename, "filename", { required: true, max: 255 });
-        if (hash(record.rawText) !== record.sha256)
-          throw new Error("Snapshot checksum mismatch.");
-        const expected = parseExport(record.rawText),
-          actual = copy(record.parsed);
-        if (!Array.isArray(actual.warnings))
-          throw new Error("Invalid snapshot parser schema.");
-        actual.warnings = actual.warnings.filter(
-          (warning) =>
-            warning !==
-            "An identical export has already been imported for this aircraft.",
-        );
-        if (JSON.stringify(expected) !== JSON.stringify(actual))
-          throw new Error("Invalid snapshot parsed evidence.");
-      }
-    }
-  }
+/** Decode a canonical base64 original with an explicit binary size bound. */
+export function decodeOriginalBase64(value) {
+  if (typeof value !== 'string' || !value.length) throw new AppError('Flight content must be canonical non-empty base64.');
+  if (value.length > 4 * Math.ceil(MAX_FLIGHT_BYTES / 3)) throw new AppError('Flight records must be 25 MiB or smaller.', 413);
+  if (value.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(value)) throw new AppError('Flight content must be canonical non-empty base64.');
+  const bytes = Buffer.from(value, 'base64');
+  if (bytes.length > MAX_FLIGHT_BYTES) throw new AppError('Flight records must be 25 MiB or smaller.', 413);
+  if (bytes.toString('base64') !== value) throw new AppError('Invalid base64 flight content.');
+  return bytes;
 }
 
-async function acquireLock(dataDir) {
-  const filename = join(dataDir, ".workspace.lock");
-  const owner = { pid: process.pid, token: randomUUID() };
-  const ownerText = JSON.stringify(owner);
-  const alive = (pid) => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch (error) {
-      return error.code !== "ESRCH";
-    }
-  };
-  const create = async () => {
-    const handle = await open(filename, "wx", 0o600);
-    try {
-      await handle.writeFile(ownerText);
-    } finally {
-      await handle.close();
-    }
-  };
+/** Preserve validated legacy IDs and payloads in the v2 catalog. */
+export function migrateLegacyCatalog(legacy) {
+  validateWorkspace(legacy);
+  if (legacy.version !== 1) throw new Error('Expected a version 1 legacy workspace.');
+  return { version: 2, aircraft: copy(legacy.aircraft), snapshots: copy(legacy.snapshots), sessions: legacy.sessions.map(session => ({ ...copy(session), flightLogId: null })), flightLogs: [] };
+}
+
+export async function safeOriginal(dataDir, log) {
+  if (!/^[a-f0-9]{64}$/.test(log.sha256)) throw new Error('Invalid original checksum path.');
+  const imports = join(dataDir, 'imports');
+  const directory = await lstat(imports);
+  if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error('Unsafe original imports directory.');
+  const path = join(imports, `${log.sha256}.bin`);
+  const info = await lstat(path);
+  if (!info.isFile() || info.isSymbolicLink() || info.size !== log.byteLength || info.size > MAX_FLIGHT_BYTES) throw new Error('Original flight file is missing or invalid.');
+  const handle = await open(path, 'r');
   try {
-    await create();
-  } catch (error) {
-    if (error.code !== "EEXIST") throw error;
-    // Serialize recovery so only one process may remove a stale lock.
-    const recovery = join(dataDir, ".workspace-recovery.lock");
-    let handle;
-    try {
-      handle = await open(recovery, "wx", 0o600);
-      let previous;
-      try {
-        previous = JSON.parse(await readFile(filename, "utf8"));
-      } catch (readError) {
-        throw new Error(
-          "Workspace lock is unreadable or recovery is in progress. Stop other servers before inspecting the lock.",
-          { cause: readError },
-        );
-      }
-      if (
-        !Number.isSafeInteger(previous.pid) ||
-        previous.pid < 1 ||
-        typeof previous.token !== "string"
-      )
-        throw new Error(
-          "Workspace lock is invalid. Preserve and inspect it while servers are stopped.",
-          { cause: error },
-        );
-      if (alive(previous.pid))
-        throw new Error(
-          "Workspace is already open in another server. Use a different data directory or stop that server.",
-          { cause: error },
-        );
-      await unlink(filename);
-      await create();
-    } catch (recoveryError) {
-      if (recoveryError.code === "EEXIST")
-        throw new Error(
-          "Workspace is already open or lock recovery is in progress.",
-          { cause: recoveryError },
-        );
-      throw recoveryError;
-    } finally {
-      if (handle) {
-        await handle.close();
-        await unlink(recovery).catch(() => {});
-      }
-    }
-  }
-  return async () => {
-    try {
-      if ((await readFile(filename, "utf8")) === ownerText)
-        await unlink(filename);
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
-  };
+    const opened = await handle.stat();
+    if (opened.ino !== info.ino || opened.dev !== info.dev) throw new Error('Original flight file changed during reading.');
+    const bytes = await handle.readFile();
+    if (hash(bytes) !== log.sha256) throw new Error('Original flight checksum does not match.');
+    return bytes;
+  } finally { await handle.close(); }
 }
 
-/** Open a private, versioned JSON workspace. Corrupt data is never overwritten. */
-export async function createStore(dataDir) {
+/** Open one-owner catalog storage; repository injection keeps automated checks database-free. */
+export async function createStore(dataDir, { repositoryFactory, decodeFlight } = {}) {
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
   const releaseLock = await acquireLock(dataDir);
-  const file = join(dataDir, "workspace.json");
-  let state = { version: 1, aircraft: [], snapshots: [], sessions: [] };
-  let exists = false;
+  let repository, state;
   try {
-    const raw = await readFile(file, "utf8");
-    exists = true;
-    state = JSON.parse(raw);
-    validateWorkspace(state);
+    const factory = repositoryFactory ?? (await import('./sqlite-repository.mjs')).createSqliteRepository;
+    repository = await factory(dataDir);
+    state = await repository.load();
+    if (state === null) {
+      let legacyRaw = null;
+      try { legacyRaw = await readFile(join(dataDir, 'workspace.json')); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+      if (legacyRaw !== null) {
+        state = migrateLegacyCatalog(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(legacyRaw)));
+        const backup = join(dataDir, `workspace-v1-${Date.now()}-${randomUUID()}.json.bak`);
+        await writeFile(backup, legacyRaw, { flag: 'wx', mode: 0o600 });
+      } else state = { version: 2, aircraft: [], snapshots: [], sessions: [], flightLogs: [] };
+      validateWorkspace(state);
+      await repository.save(state, null);
+    } else {
+      validateWorkspace(state);
+      if (state.version !== 2) throw new Error('Repository must contain a version 2 catalog.');
+    }
+    for (const log of state.flightLogs) await safeOriginal(dataDir, log);
+    const telemetry = await repository.exportTelemetry();
+    validateTelemetry(state, telemetry);
   } catch (error) {
-    if (error.code !== "ENOENT" || exists) {
-      await releaseLock();
-      throw new Error(
-        "Cannot open workspace: invalid or unreadable data. Preserve the file and restore a valid backup before restarting.",
-        { cause: error },
-      );
-    }
+    await repository?.close();
+    await releaseLock();
+    throw new Error('Cannot open workspace: invalid or unreadable data. Preserve it and restore a complete backup before restarting.', { cause: error });
   }
-  async function persist(next) {
-    const temporary = join(dataDir, `.workspace-${randomUUID()}.tmp`);
-    try {
-      await writeFile(temporary, JSON.stringify(next, null, 2) + "\n", {
-        mode: 0o600,
-        flag: "wx",
-      });
-      await rename(temporary, file);
-    } catch (error) {
-      await unlink(temporary).catch(() => {});
-      throw error;
-    }
-  }
-  if (!exists) {
-    try {
-      await persist(state);
-    } catch (error) {
-      await releaseLock();
-      throw error;
-    }
-  }
-  let queue = Promise.resolve();
-  let closed = false;
-  let closePromise;
-  const mutate = (operation) => {
-    if (closed) return Promise.reject(new AppError("Workspace is closed."));
+  let queue = Promise.resolve(), closed = false, closePromise;
+  const mutate = operation => {
+    if (closed) return Promise.reject(new AppError('Workspace is closed.'));
     const work = queue.then(async () => {
       const next = copy(state);
-      const result = operation(next);
-      await persist(next);
+      const result = await operation(next);
+      try { await repository.save(next, state, result.persistence ?? {}); }
+      catch (error) { await result.rollback?.(); throw error; }
       state = next;
-      return copy(result);
+      return copy(result.value);
     });
     queue = work.catch(() => {});
     return work;
   };
-  return {
-    close: () => {
-      if (!closePromise) {
-        closed = true;
-        closePromise = queue.then(releaseLock);
-      }
+  const sessionRecord = input => ({ id: randomUUID(), aircraftId: input.aircraftId, snapshotId: null, flightLogId: null, title: input.title, flownAt: input.flownAt, location: '', durationMinutes: null, battery: '', props: '', conditions: '', notes: '', outcome: 'unrated', mediaRefs: [], confirmedSetup: false, ...input, createdAt: timestamp() });
+  const store = {
+    close() {
+      if (!closePromise) { closed = true; closePromise = queue.then(async () => { try { await repository.close(); } finally { await releaseLock(); } }); }
       return closePromise;
     },
-    getState: () =>
-      copy({
-        aircraft: state.aircraft,
-        snapshots: state.snapshots.map(summarizeSnapshot),
-        sessions: state.sessions,
-      }),
-    getSnapshot: (id) => copy(getRecord(state, "snapshots", id)),
-    exportWorkspace: () => copy(state),
-    createAircraft: (input) =>
-      mutate((next) => {
-        objectInput(
-          input,
-          aircraftFields.filter((field) => field !== "baselineSnapshotId"),
-        );
-        const record = {
-          id: randomUUID(),
-          name: input.name,
-          kind: input.kind ?? "",
-          notes: input.notes ?? "",
-          baselineSnapshotId: null,
-          createdAt: timestamp(),
-        };
-        next.aircraft.push(record);
-        validateAircraft(next, record);
-        return record;
-      }),
-    updateAircraft: (id, input) =>
-      mutate((next) => {
-        objectInput(input, aircraftFields);
-        const record = getRecord(next, "aircraft", id);
-        Object.assign(record, input);
-        validateAircraft(next, record);
-        return record;
-      }),
-    importSnapshot: (input) =>
-      mutate((next) => {
-        objectInput(input, [
-          "aircraftId",
-          "label",
-          "filename",
-          "rawText",
-          "notes",
-        ]);
-        getRecord(next, "aircraft", input.aircraftId);
-        textField(input.label, "label", { required: true, max: 200 });
-        textField(input.filename, "filename", { required: true, max: 255 });
-        const notes = textField(input.notes ?? "", "notes");
-        const parsed = parseExport(input.rawText);
-        const sha256 = hash(input.rawText);
-        if (
-          next.snapshots.some(
-            (snapshot) =>
-              snapshot.aircraftId === input.aircraftId &&
-              snapshot.sha256 === sha256,
-          )
-        )
-          parsed.warnings.push(
-            "An identical export has already been imported for this aircraft.",
-          );
-        const record = {
-          id: randomUUID(),
-          aircraftId: input.aircraftId,
-          label: input.label,
-          notes,
-          filename: input.filename,
-          importedAt: timestamp(),
-          sha256,
-          rawText: input.rawText,
-          parsed,
-        };
-        next.snapshots.push(record);
-        return record;
-      }),
-    createSession: (input) =>
-      mutate((next) => {
-        objectInput(input, sessionFields);
-        const record = {
-          id: randomUUID(),
-          aircraftId: input.aircraftId,
-          snapshotId: null,
-          title: input.title,
-          flownAt: input.flownAt,
-          location: "",
-          durationMinutes: null,
-          battery: "",
-          props: "",
-          conditions: "",
-          notes: "",
-          outcome: "unrated",
-          mediaRefs: [],
-          confirmedSetup: false,
-          ...input,
-          createdAt: timestamp(),
-        };
-        validateSession(next, record);
-        next.sessions.push(record);
-        return record;
-      }),
-    updateSession: (id, input) =>
-      mutate((next) => {
-        objectInput(input, sessionFields);
-        const record = getRecord(next, "sessions", id);
-        Object.assign(record, input);
-        validateSession(next, record);
-        return record;
-      }),
+    getState: () => copy({ aircraft: state.aircraft, snapshots: state.snapshots.map(summarizeSnapshot), sessions: state.sessions, flightLogs: state.flightLogs, storage: 'sqlite' }),
+    getSnapshot: id => copy(getRecord(state, 'snapshots', id)),
+    getFlightLog: id => copy(getRecord(state, 'flightLogs', id)),
+    getFlightOriginal: id => safeOriginal(dataDir, getRecord(state, 'flightLogs', id)),
+    async getFlightFrames(id, offset = 0, limit = 100) {
+      const log = getRecord(state, 'flightLogs', id);
+      if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new AppError('Use a non-negative integer offset and limit from 1 to 1000.');
+      const frames = await repository.readFrames(id, offset, limit);
+      validateFrames(frames);
+      return { frames, total: log.frameCount, offset, limit };
+    },
+    async exportWorkspace() {
+      const work = queue.then(async () => {
+        const catalog = copy(state), originals = [];
+        for (const log of catalog.flightLogs) originals.push({ flightLogId: log.id, contentBase64: (await safeOriginal(dataDir, log)).toString('base64') });
+        const telemetry = await repository.exportTelemetry();
+        validateTelemetry(catalog, telemetry);
+        return { ...catalog, originals, telemetry: copy(telemetry) };
+      });
+      queue = work.catch(() => {});
+      return work;
+    },
+    createAircraft: input => mutate(next => {
+      objectInput(input, aircraftFields.filter(field => field !== 'baselineSnapshotId'));
+      const record = { id: randomUUID(), name: input.name, kind: input.kind ?? '', notes: input.notes ?? '', baselineSnapshotId: null, createdAt: timestamp() };
+      next.aircraft.push(record); validateAircraft(next, record); return { value: record };
+    }),
+    updateAircraft: (id, input) => mutate(next => {
+      objectInput(input, aircraftFields); const record = getRecord(next, 'aircraft', id);
+      Object.assign(record, input); validateAircraft(next, record); return { value: record };
+    }),
+    importSnapshot: input => mutate(next => {
+      objectInput(input, ['aircraftId', 'label', 'filename', 'rawText', 'notes']);
+      getRecord(next, 'aircraft', input.aircraftId);
+      textField(input.label, 'label', { required: true, max: 200 }); textField(input.filename, 'filename', { required: true, max: 255 });
+      const notes = textField(input.notes ?? '', 'notes'), parsed = parseExport(input.rawText), sha256 = hash(input.rawText);
+      if (next.snapshots.some(snapshot => snapshot.aircraftId === input.aircraftId && snapshot.sha256 === sha256)) parsed.warnings.push('An identical export has already been imported for this aircraft.');
+      const record = { id: randomUUID(), aircraftId: input.aircraftId, label: input.label, notes, filename: input.filename, importedAt: timestamp(), sha256, rawText: input.rawText, parsed };
+      next.snapshots.push(record); return { value: record };
+    }),
+    createSession: input => mutate(next => {
+      objectInput(input, sessionFields); const record = sessionRecord(input);
+      validateSession(next, record); next.sessions.push(record); return { value: record };
+    }),
+    updateSession: (id, input) => mutate(next => {
+      objectInput(input, sessionFields); const record = getRecord(next, 'sessions', id);
+      Object.assign(record, input); validateSession(next, record); return { value: record };
+    }),
+    updateFlightLog: (id, input) => mutate(next => {
+      objectInput(input, ['airdataStatus']);
+      const record = getRecord(next, 'flightLogs', id);
+      Object.assign(record, input); validateFlightLog(next, record); return { value: record };
+    }),
+    importFlightLog: input => mutate(async next => {
+      objectInput(input, ['aircraftId', 'filename', 'sourceDevice', 'contentBase64']);
+      getRecord(next, 'aircraft', input.aircraftId);
+      textField(input.filename, 'filename', { required: true, max: 255 });
+      const sourceDevice = textField(input.sourceDevice ?? '', 'sourceDevice', { max: 200 });
+      const bytes = decodeOriginalBase64(input.contentBase64), sha256 = hash(bytes);
+      const existing = next.flightLogs.find(log => log.sha256 === sha256);
+      if (existing) {
+        if (existing.aircraftId !== input.aircraftId) throw new AppError('These original flight bytes are already attached to another aircraft. Select that aircraft to view the existing import.', 409);
+        return { value: { flightLog: existing, session: next.sessions.find(session => session.flightLogId === existing.id) ?? null, duplicate: true } };
+      }
+      const decoder = decodeFlight ?? (await import('./dji-import.mjs')).decodeDjiFlight;
+      const decoded = await decoder(bytes, { filename: input.filename });
+      validateFrames(decoded.frames);
+      const log = { id: randomUUID(), aircraftId: input.aircraftId, filename: input.filename, sourceDevice, importedAt: timestamp(), sha256, byteLength: bytes.length, format: decoded.format, logVersion: decoded.logVersion, status: decoded.status, summary: copy(decoded.summary), frameCount: decoded.frames.length, warnings: copy(decoded.warnings), airdataStatus: 'unknown' };
+      if (log.summary.startTime === null) log.warnings.push('Start time is unavailable. The original was retained; create a session manually using a verified flight time.');
+      validateFlightLog(next, log);
+      next.flightLogs.push(log);
+      let session = null;
+      if (log.summary.startTime !== null) {
+        session = sessionRecord({ aircraftId: log.aircraftId, flightLogId: log.id, title: `DJI flight ${log.summary.startTime.slice(0, 10)}`, flownAt: log.summary.startTime, durationMinutes: log.summary.durationSeconds === null ? null : log.summary.durationSeconds / 60, location: log.summary.location ?? '' });
+        validateSession(next, session); next.sessions.push(session);
+      }
+      const imports = join(dataDir, 'imports'); await mkdir(imports, { recursive: true, mode: 0o700 });
+      const info = await lstat(imports); if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Unsafe original imports directory.');
+      const originalPath = join(imports, `${sha256}.bin`);
+      let created = false;
+      try { await writeFile(originalPath, bytes, { flag: 'wx', mode: 0o600 }); created = true; }
+      catch (error) { if (error.code !== 'EEXIST') throw error; await safeOriginal(dataDir, log); }
+      return { value: { flightLog: log, session, duplicate: false }, persistence: { telemetry: { flightLogId: log.id, frames: decoded.frames } }, rollback: async () => { if (created) await unlink(originalPath); } };
+    }),
   };
+  store.getFlightLogRaw = store.getFlightOriginal;
+  store.getFlightLogFrames = store.getFlightFrames;
+  return store;
+}
+
+/** Check one complete frame group per imported log and exact metadata counts. */
+export function validateTelemetry(catalog, telemetry) {
+  if (!Array.isArray(telemetry) || telemetry.length !== catalog.flightLogs.length) throw new Error('Incomplete telemetry backup.');
+  const seen = new Set();
+  for (const item of telemetry) {
+    objectInput(item, ['flightLogId', 'frames']);
+    const log = getRecord(catalog, 'flightLogs', item.flightLogId);
+    if (seen.has(log.id)) throw new Error('Duplicate telemetry group.');
+    seen.add(log.id); validateFrames(item.frames);
+    if (item.frames.length !== log.frameCount) throw new Error('Telemetry count does not match the imported log.');
+  }
 }

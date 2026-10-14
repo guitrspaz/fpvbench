@@ -16,6 +16,7 @@ const examplesDefault = resolve(
   "../examples",
 );
 const BODY_LIMIT = 1536 * 1024;
+const FLIGHT_BODY_LIMIT = 36 * 1024 * 1024;
 const CSP =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 const types = {
@@ -45,20 +46,20 @@ function verifyLocalRequest(req) {
   if (req.headers["sec-fetch-site"] === "cross-site")
     throw new AppError("Cross-site requests are not allowed.", 403);
 }
-async function body(req) {
+async function body(req, limit = BODY_LIMIT) {
   if (
     !/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(
       req.headers["content-type"] ?? "",
     )
   )
     throw new AppError("Use application/json content type.", 415);
-  if (Number(req.headers["content-length"]) > BODY_LIMIT)
+  if (Number(req.headers["content-length"]) > limit)
     throw new AppError("Request body is too large.", 413);
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > BODY_LIMIT)
+    if (size > limit)
       throw new AppError("Request body is too large.", 413);
     chunks.push(chunk);
   }
@@ -90,8 +91,9 @@ export async function createServer({
   dataDir = process.env.FPVBENCH_DATA_DIR || resolve(homedir(), ".fpvbench"),
   publicDir = publicDefault,
   examplesDir = examplesDefault,
+  storeFactory = createStore,
 } = {}) {
-  const store = await createStore(dataDir);
+  const store = await storeFactory(dataDir);
   const publicRoot = resolve(publicDir);
   const server = httpServer(async (req, res) => {
     res.setHeader("Content-Security-Policy", CSP);
@@ -115,7 +117,7 @@ export async function createServer({
       const url = new URL(req.url, `http://${req.headers.host}`),
         path = url.pathname;
       const match = path.match(
-        /^\/api\/(aircraft|snapshots|sessions)\/([^/]+)(\/raw)?$/,
+        /^\/api\/(aircraft|snapshots|sessions|flight-logs)\/([^/]+)(\/(?:raw|frames))?$/,
       );
       if (req.method === "GET" && path === "/api/state")
         return json(res, 200, store.getState());
@@ -123,7 +125,7 @@ export async function createServer({
         return attachment(
           res,
           "fpvbench-workspace.json",
-          JSON.stringify(store.exportWorkspace(), null, 2) + "\n",
+          JSON.stringify(await store.exportWorkspace(), null, 2) + "\n",
           "application/json; charset=utf-8",
         );
       if (req.method === "GET" && path === "/api/compare") {
@@ -144,6 +146,10 @@ export async function createServer({
         return json(res, 201, await store.importSnapshot(await body(req)));
       if (req.method === "POST" && path === "/api/sessions")
         return json(res, 201, await store.createSession(await body(req)));
+      if (req.method === "POST" && path === "/api/flight-logs") {
+        const result = await store.importFlightLog(await body(req, FLIGHT_BODY_LIMIT));
+        return json(res, result.duplicate ? 200 : 201, result);
+      }
       if (
         match &&
         !match[3] &&
@@ -166,9 +172,12 @@ export async function createServer({
           200,
           await store.updateSession(match[2], await body(req)),
         );
+      if (match && !match[3] && req.method === "PATCH" && match[1] === "flight-logs")
+        return json(res, 200, await store.updateFlightLog(match[2], await body(req)));
       if (match && req.method === "GET" && match[1] === "snapshots") {
         const snapshot = store.getSnapshot(match[2]);
-        return match[3]
+        if (match[3] === "/frames") throw new AppError("API route was not found.", 404);
+        return match[3] === "/raw"
           ? attachment(
               res,
               snapshot.filename,
@@ -176,6 +185,20 @@ export async function createServer({
               "text/plain; charset=utf-8",
             )
           : json(res, 200, snapshot);
+      }
+      if (match && req.method === "GET" && match[1] === "flight-logs") {
+        if (match[3] === "/raw") {
+          const original = await store.getFlightOriginal(match[2]);
+          const flightLog = store.getFlightLog(match[2]);
+          return attachment(res, flightLog.filename, original.bytes ?? original,
+            flightLog.format === "dji-json" ? "application/json" : "application/octet-stream");
+        }
+        if (match[3] === "/frames") {
+          const offset = integerQuery(url, "offset", 0, Number.MAX_SAFE_INTEGER);
+          const limit = integerQuery(url, "limit", 100, 1000, 1);
+          return json(res, 200, await store.getFlightFrames(match[2], offset, limit));
+        }
+        return json(res, 200, store.getFlightLog(match[2]));
       }
       if (path.startsWith("/api/"))
         throw new AppError("API route was not found.", 404);
@@ -240,6 +263,14 @@ export async function createServer({
     });
   });
   return server;
+}
+
+function integerQuery(url, key, defaultValue, max, min = 0) {
+  const text = url.searchParams.get(key);
+  if (text === null) return defaultValue;
+  if (!/^\d+$/.test(text) || !Number.isSafeInteger(Number(text)) || Number(text) < min || Number(text) > max)
+    throw new AppError(`${key} must be an integer from ${min} to ${max}.`);
+  return Number(text);
 }
 
 if (

@@ -35,13 +35,16 @@
         <button class="nav-item" data-view="sessions">
           <span aria-hidden="true">↗</span> Flight sessions
         </button>
+        <button class="nav-item" data-view="flights">
+          <span aria-hidden="true">▥</span> DJI flight imports
+        </button>
       </nav>
       <div class="sidebar-note">
         <span class="status-dot"></span> Local workspace
         <p>Your exports stay on this computer. No controller connection.</p>
       </div>
       <a class="export-link" href="/api/export" download>↓ Export workspace</a>
-      <span class="version">FPVBENCH / v0.1</span>
+      <span class="version">FPVBENCH / v0.2</span>
     </aside>
     <main>
       <header class="topbar">
@@ -58,6 +61,7 @@
           </p>
         </div>
         <div class="heading-actions">
+          <button id="import-flights" class="secondary">↑ Import DJI flights</button>
           <button id="new-session" class="secondary">+ Log a flight</button
           ><button id="import-snapshot" class="primary">↑ Import setup</button>
         </div>
@@ -175,8 +179,21 @@
         </div>
       </form>
     </dialog>
+    <dialog id="flight-import-dialog" aria-labelledby="flight-import-title">
+      <form id="flight-import-form">
+        <div class="dialog-heading"><div><p class="eyebrow">COPIED RECORDS · LOCAL IMPORT</p><h2 id="flight-import-title">Import DJI flights</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close DJI import dialog">×</button></div>
+        <p class="form-help">Choose copied DJI TXT flight records or compatible decoded DJI JSON. Files stay on this computer. Encrypted telemetry is unavailable without keys; readable flight details can still be saved.</p>
+        <label>Source device (optional)<input name="sourceDevice" maxlength="120" placeholder="e.g. DJI RC or mobile device"></label>
+        <label class="file-field">Choose one or more flight records · maximum 25 MiB each<input name="files" type="file" accept=".txt,.json" multiple required></label>
+        <p class="form-help">Importing never connects to your aircraft or requests cloud keys. Valid flight dates create session records automatically; you can add observations afterward.</p>
+        <div id="flight-import-results" aria-live="polite"></div>
+        <p class="form-error" role="alert" hidden></p>
+        <div class="form-actions"><button type="button" class="secondary close-dialog">Close</button><button type="submit" class="primary">Import selected flights</button></div>
+      </form>
+    </dialog>
     <dialog id="session-dialog" aria-labelledby="session-title">
       <form id="session-form">
+        <p id="session-import-origin" class="form-help" hidden></p>
         <div class="dialog-heading">
           <div>
             <p class="eyebrow">FIELD NOTES</p>

@@ -1,6 +1,6 @@
 {
   "name": "fpvbench",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "A local workbench for FPV setup history and flight-session records.",
@@ -11,20 +11,24 @@
   "scripts": {
     "start": "node src/server.mjs",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
-    "lint": "eslint src public tests eslint.config.mjs jest.config.mjs",
+    "lint": "eslint src public tests dev eslint.config.mjs jest.config.mjs",
     "check": "npm run lint && npm test",
-    "test:browser": "node tests/browser/run.mjs"
+    "test:browser": "node tests/browser/run.mjs",
+    "restore": "node src/restore.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
     "eslint": "^10.12.0",
     "globals": "^17.13.0",
-    "jest": "^30.5.2",
-    "@playwright/test": "^1.64.0"
+    "jest": "^30.5.2"
   },
   "overrides": {
     "@istanbuljs/load-nyc-config": {
       "js-yaml": "^4.3.2"
     }
+  },
+  "dependencies": {
+    "dji-log-parser-js": "0.5.7"
   }
 }

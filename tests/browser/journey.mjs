@@ -9,10 +9,12 @@ export async function runJourney({ page, expect, baseURL, baselineText, experime
     throw new Error('Browser smoke requires a loopback target.');
   }
   const errors = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  page.on('console', (message) => {
+  const onPageError = (error) => errors.push(error.message);
+  const onConsole = (message) => {
     if (message.type() === 'error') errors.push(message.text());
-  });
+  };
+  page.on('pageerror', onPageError);
+  page.on('console', onConsole);
   await page.goto(baseURL);
   await expect(page.getByRole('heading', { name: 'Your flight workbench' })).toBeVisible();
   await expect(page.getByRole('button', { name: '↑ Import setup', exact: true })).toBeDisabled();
@@ -113,6 +115,8 @@ export async function runJourney({ page, expect, baseURL, baselineText, experime
   }
   if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/fpvbench-mobile-session.png`, fullPage: true });
   expect(errors).toEqual([]);
+  page.off('pageerror', onPageError);
+  page.off('console', onConsole);
   return {
     passed: ['empty state', 'create aircraft', 'BOM/CRLF file import and exact raw download', 'paste import', 'baseline',
       'changed and sparse-unknown comparison', 'comparison filter', 'inert imported HTML',

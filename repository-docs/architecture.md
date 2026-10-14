@@ -2,51 +2,53 @@
 
 ## Local application
 
-FPVBench v0.1 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime modules use Node built-ins.
+FPVBench v0.2 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly.
 
-The interface calls JSON endpoints for aircraft, imports, comparison, and flight sessions. Browser local storage remembers only the selected aircraft; the server owns the workspace data.
+The interface calls JSON endpoints for aircraft, setup imports/comparison, sessions, and DJI flight records. Browser local storage remembers only the selected aircraft; the server owns the data.
 
 ## Modules
 
 | Module | Responsibility |
 | --- | --- |
-| `src/parser.mjs` | Treat a Betaflight export as inert text; extract version, export scope, profile-aware settings and supported configuration commands. |
-| `src/compare.mjs` | Build history summaries and comparisons without inventing omitted defaults. |
-| `src/store.mjs` | Validate relationships and fields; preserve snapshots; serialize atomic local-file writes. |
-| `src/server.mjs` | Loopback HTTP entry point, API routing, bounded input, downloads and static assets. |
+| `src/parser.mjs` | Parse inert Betaflight text into profile-aware settings and metadata. |
+| `src/compare.mjs` | Summarize and compare supplied evidence without inventing omitted defaults. |
+| `src/store.mjs` | Validate relationships, serialize mutations, migrate legacy data, and retain originals. |
+| `src/workspace-validation.mjs` | Validate catalog, sourced summaries, and normalized frames. |
+| `src/workspace-lock.mjs` | Own/recover the data-directory lock. |
+| `src/restore.mjs` | Validate complete backups, stage a database, and preserve the previous workspace. |
+| `src/sqlite-repository.mjs` | Prepared SQLite persistence and telemetry pagination. |
+| `src/dji-import.mjs` | Bound decoding requests and validate/normalize DJI evidence. |
+| `src/dji-worker.mjs` | Isolate file decoding from the HTTP event loop. |
+| `src/server.mjs` | Loopback entry point, APIs, bounded input, downloads, and static assets. |
 | `src/errors.mjs` | Application errors and unsafe-object validation. |
-| `public/app.js` | Aircraft selection, history/details, comparisons, imports and session forms. |
+| `public/app.js` | Aircraft/history/comparison views, imports, and session forms. |
 
-## Workspace schema
+## SQLite and originals
 
-`workspace.json` has `version: 1` and three collections: `aircraft`, `snapshots`, and `sessions`. UUIDs link a snapshot or session to an aircraft. An aircraft's optional baseline must reference its own snapshot; a session's optional snapshot must belong to its aircraft.
+`workspace.sqlite` has tables for aircraft, snapshots, sessions, flight logs, telemetry frames, and metadata. Objects retain JSON payloads alongside indexed identifiers and relationships. Foreign keys and transactions support the store's validation; mutations write changed records. Telemetry is stored separately so the ordinary state response stays small.
 
-Snapshots are immutable records containing the source text, SHA-256 fingerprint, filename, import time, notes and parsed evidence. Session records can be edited. The schema and HTTP response fields are defined in [v0.1 scope](scope-v0.1.md).
+An aircraft's baseline and a session's setup snapshot must belong to that aircraft. A session can link to an imported flight only for its aircraft. Each imported flight can create at most one linked session. Snapshot source and imported flight evidence are immutable; observations remain editable.
 
-A write clones the current state, validates the operation, writes a temporary local file, and renames it into place before publishing the new in-memory state. Mutations are serialized. The workspace has one live owner per data directory to prevent competing servers from overwriting history. Files are created with owner-only permissions.
+The data directory has one live owner. Writes are serialized, and new state is published after repository persistence succeeds. The original DJI bytes are stored under `imports/<sha256>.bin`. Original filenames are metadata rather than filesystem paths. Downloads check the original fingerprint.
 
-Opening a workspace validates its schema, relationships, checksums and parsed evidence. Invalid data is rejected without replacement. Restore a complete export while the server is stopped; preserve the old file before replacing it.
+First open validates legacy v1 JSON, creates an unchanged timestamped backup, and migrates IDs, relationships, and notes transactionally. SQLite becomes authoritative; legacy JSON is retained. Corrupt data fails without replacement. Complete v2 exports include catalog, original files, and telemetry. Restore runs locally while the server is stopped and preserves the prior workspace. See [storage and backups](storage-and-backups.md).
 
-## Evidence and comparisons
+## Evidence
 
-Setting keys include scope and profile, so PID profile 0 and PID profile 1 cannot overwrite each other. Supported indexed configuration commands use stable identities such as serial-port number or resource name/index.
+Setting keys include scope/profile. Sparse Betaflight omissions stay unknown; the app has no guessed firmware-default table. Explicit selected-profile metadata and firmware/board differences remain visible. Literal setting differences do not establish performance or firmware compatibility.
 
-A `diff` export is sparse. Missing values are unknown unless the relevant side is a sufficiently complete `dump all` export. Neither the parser nor comparison loads a guessed firmware-default table. Explicit selected-profile metadata appears in comparisons when the export captures it. Firmware and board differences remain visible warnings.
-
-Literal differences are not a firmware migration or an assessment of flight performance. The flight-session record supplies observations, conditions, equipment notes and an explicit setup-confirmation field.
+DJI imports supply locally available summary measurements and, where supported, telemetry. Binary records are processed in a bounded worker with a timeout. Modern encrypted records retain summary-only status; no remote keychain request occurs. Decoding and imported session creation do not establish the aircraft's Betaflight setup. See [DJI flight imports](dji-flight-imports.md).
 
 ## Local boundary
 
-The server validates loopback Host headers, rejects foreign origins and cross-site requests, requires JSON for mutations, bounds source/request size, and restricts static paths. A content security policy limits the browser to local assets. User text is rendered as text rather than executable markup. Raw export downloads are attachments.
+The server validates loopback Host headers, rejects foreign origins and cross-site requests, requires JSON for mutations, bounds file/request size, and restricts static paths. CSP limits the browser to local assets. User text renders as text, and original downloads are attachments.
 
-The server has no controller connection, serial-write implementation, shell execution of imported content, or media-fetch function. This is a local configuration, not an authenticated internet service.
+The app has no controller connection, serial-write implementation, imported-content shell execution, remote decoding, or media-fetch function. This local configuration has no authenticated multi-user internet-hosting layer.
 
-## Future device integration
+## Validation seams
 
-A later USB/MSP reader can supply captured evidence to the same snapshot workflow. Controller deployment would be a separate operation with a verified target/version, a fresh backup, a readable preview and an explicit write decision. v0.1 implements neither connection nor deployment.
+Jest and browser checks inject a synthetic memory repository through store/server factories. They never open a database. Synthetic decoder seams exercise contracts, malformed input, and error handling.
 
-## Development dependencies
+A separately invoked operational proof uses actual SQLite in a disposable temporary workspace to check migration, restart, rollback, complete backup/restore, and raw bytes. Actual WASM decoding uses a synthetic flight record. Real device samples remain a separate compatibility check.
 
-Jest covers parser, comparison, store and HTTP behavior. Playwright covers the browser workflow. ESLint checks source and test code.
-
-The npm override for `@istanbuljs/load-nyc-config` selects `js-yaml` 4.3.2 or later in the 4.x line. Its consumer uses the supported `load` API; this avoids a vulnerable legacy formatting dependency in the test-tool chain. Tests and dependency audit validate the resulting installation.
+Jest, Playwright, and ESLint are development dependencies. The `@istanbuljs/load-nyc-config` override selects `js-yaml` 4.3.2 or later in the 4.x line, avoiding a vulnerable legacy dependency in the test chain.
