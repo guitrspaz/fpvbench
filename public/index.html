@@ -17,6 +17,8 @@
           ><small>YOUR FLIGHT WORKBENCH</small></span
         ></a
       >
+      <label class="field-label" for="fleet-status-filter">FLEET</label>
+      <select id="fleet-status-filter" aria-label="Fleet status filter"><option value="active">Active aircraft</option><option value="all">All aircraft</option><option value="retired">Retired aircraft</option></select>
       <label class="field-label" for="aircraft-select">AIRCRAFT</label>
       <select id="aircraft-select" aria-label="Selected aircraft">
         <option value="">Loading…</option>
@@ -106,6 +108,8 @@
             maxlength="120"
             placeholder="e.g. Betaflight freestyle quad"
         /></label>
+        <label>Aircraft status<select name="status"><option value="active">Active</option><option value="retired">Retired</option></select></label>
+        <p class="form-help">Retired aircraft keep all their history and appear under All aircraft or Retired aircraft.</p>
         <div class="form-grid">
           <label>Registration ID<input name="registrationId" maxlength="200" autocomplete="off" spellcheck="false" /></label>
           <label>Serial number<input name="serialNumber" maxlength="200" autocomplete="off" spellcheck="false" /></label>

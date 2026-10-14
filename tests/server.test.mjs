@@ -35,6 +35,14 @@ test('aircraft identifiers are editable through the API and retained in state an
   }
 });
 
+test('aircraft status is editable through the API and retained in state and export', async () => {
+  const aircraft = await (await request('/api/aircraft', 'POST', { name: 'Historical quad' })).json();
+  expect(aircraft.status).toBe('active');
+  const retired = await request(`/api/aircraft/${aircraft.id}`, 'PATCH', { status: 'retired' });
+  expect(retired.status).toBe(200);
+  for (const path of ['/api/state', '/api/export']) expect((await (await request(path)).json()).aircraft[0].status).toBe('retired');
+});
+
 test('bulk import can retain an unassigned flight before any aircraft exists and assign it later', async () => {
   const imported = await request('/api/flight-logs', 'POST', { filename: 'empty-fleet.json', contentBase64: Buffer.from('synthetic unassigned').toString('base64') });
   expect(imported.status).toBe(201);

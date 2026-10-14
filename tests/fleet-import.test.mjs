@@ -46,6 +46,18 @@ test('ambiguous aircraft serial stays in the inbox', async () => {
   expect((await store.importFlightLog(payload('SAME'))).flightLog.aircraftId).toBeNull();
 });
 
+test('retired aircraft still owns its archived imported logs and AirData history', async () => {
+  const old = await store.createAircraft({ name: 'Old quad', serialNumber: 'OLD-SERIAL' });
+  await store.createAircraft({ name: 'Current quad', serialNumber: 'NEW-SERIAL' });
+  const first = await store.importFlightLog(payload('OLD-SERIAL'));
+  await store.updateFlightLog(first.flightLog.id, { airdataStatus: 'uploaded' });
+  await store.updateAircraft(old.id, { status: 'retired' });
+  const later = await store.importFlightLog(payload('OLD-SERIAL', { startTime: '2026-10-14T13:00:00Z' }));
+  expect(later.flightLog.aircraftId).toBe(old.id);
+  expect(store.getFlightLog(first.flightLog.id).airdataStatus).toBe('uploaded');
+  expect((await store.exportWorkspace()).originals).toHaveLength(2);
+});
+
 test('modern TXT 16-character aircraft serial uniquely matches the full 20-character DJI serial', async () => {
   decoderFormat = 'dji-txt';
   const short = '1581F12345678ABC';

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { AppError, assertSafeObject, containsControlText } from "./errors.mjs";
 import { parseExport } from "./parser.mjs";
 
-export const aircraftFields = ["name", "kind", "registrationId", "serialNumber", "flightRecordSerials", "notes", "baselineSnapshotId"];
+export const aircraftFields = ["name", "kind", "registrationId", "serialNumber", "flightRecordSerials", "status", "notes", "baselineSnapshotId"];
 export const sessionFields = [
   "aircraftId",
   "snapshotId",
@@ -87,6 +87,7 @@ function snapshotRelationship(state, aircraftId, snapshotId) {
   }
 }
 export function validateAircraft(state, record) {
+  if (record.status !== undefined && !["active", "retired"].includes(record.status)) throw new AppError("Aircraft status must be active or retired.");
   textField(record.name, "name", { required: true, max: 200 });
   textField(record.kind, "kind", { max: 200 });
   // Older catalogs and backups may omit these optional aircraft identifiers.

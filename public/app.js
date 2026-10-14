@@ -2,6 +2,8 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const content = $("#content");
 let state = { aircraft: [], snapshots: [], sessions: [], flightLogs: [] };
 let aircraftId = localStorage.getItem("fpvbench.aircraft") || "";
+const savedFleetStatus = localStorage.getItem("fpvbench.fleetStatus");
+let fleetStatus = ["active", "all", "retired"].includes(savedFleetStatus) ? savedFleetStatus : "active";
 let currentView = "overview";
 let detailId = null;
 let editingSessionId = null;
@@ -52,6 +54,10 @@ function date(value, withTime = false) {
   }).format(new Date(value));
 }
 
+const statusOf = aircraft => aircraft.status ?? "active";
+const aircraftLabel = aircraft => `${aircraft.name}${statusOf(aircraft) === "retired" ? " (Retired)" : ""}`;
+function visibleAircraft() { return state.aircraft.filter(aircraft => fleetStatus === "all" || statusOf(aircraft) === fleetStatus); }
+
 function selectedAircraft() {
   return state.aircraft.find((item) => item.id === aircraftId);
 }
@@ -101,15 +107,15 @@ function notify(message, error = false) {
 
 async function refresh() {
   [state] = await Promise.all([api("/api/state"), readAiSettings()]);
-  if (!selectedAircraft()) aircraftId = state.aircraft[0]?.id || "";
+  const visible = visibleAircraft();
+  if (!visible.some(aircraft => aircraft.id === aircraftId)) aircraftId = visible[0]?.id || "";
+  $("#fleet-status-filter").value = fleetStatus;
   localStorage.setItem("fpvbench.aircraft", aircraftId);
   const selector = $("#aircraft-select");
   selector.replaceChildren(
-    ...(state.aircraft.length
-      ? state.aircraft.map((item) =>
-          element("option", { value: item.id, text: item.name }),
-        )
-      : [element("option", { value: "", text: "No aircraft yet" })]),
+    ...(visible.length
+      ? visible.map((item) => element("option", { value: item.id, text: aircraftLabel(item) }))
+      : [element("option", { value: "", text: state.aircraft.length ? "No aircraft in this view" : "No aircraft yet" })]),
   );
   selector.value = aircraftId;
   $("#import-snapshot").disabled = !aircraftId;
@@ -136,6 +142,12 @@ function empty(
 }
 
 function showOnboarding() {
+  if (state.aircraft.length) return content.replaceChildren(empty(
+    fleetStatus === "retired" ? "No retired aircraft" : "No active aircraft",
+    "Your aircraft and their history are preserved. Switch the fleet filter to see another part of your fleet.",
+    async () => { fleetStatus = "all"; localStorage.setItem("fpvbench.fleetStatus", fleetStatus); await refresh(); },
+    "Show all aircraft"));
+
   const panel = empty(
     "A fresh start for your fleet",
     "Keep your preferred setup, see what changed, and connect each experiment to a flight. Start by adding your first aircraft.",
@@ -262,7 +274,7 @@ function showOverview() {
   const identifiers = element("dl", { class: "flight-properties" });
   for (const [label, value] of [["Type / build", aircraft.kind], ["Registration ID", aircraft.registrationId], ["Serial number", aircraft.serialNumber]])
     identifiers.append(element("div", {}, element("dt", { text: label }), element("dd", { text: value || "Not recorded" })));
-  const aircraftPanel = element("section", { class: "panel" }, panelHeading("Aircraft details"), identifiers);
+  const aircraftPanel = element("section", { class: "panel" }, panelHeading("Aircraft details"), badge(statusOf(aircraft) === "retired" ? "RETIRED" : "ACTIVE", statusOf(aircraft) === "retired" ? "amber" : "green"), identifiers);
   const history = snapshots();
   const flights = sessions();
   const baseline = history.find(
@@ -1322,7 +1334,7 @@ async function showFlightDetail(id, revision) {
       element("p", { class: "proof-note", text: "Values are sourced from this flight record. Unavailable fields stay unknown. Telemetry does not describe or confirm Betaflight settings." }));
     const assignment = element("select", { "aria-label": "Assign flight to aircraft" },
       element("option", { value: "", text: "Choose an aircraft" }),
-      ...state.aircraft.map(aircraft => element("option", { value: aircraft.id, text: aircraft.name })));
+      ...state.aircraft.map(aircraft => element("option", { value: aircraft.id, text: aircraftLabel(aircraft) })));
     assignment.value = log.aircraftId || "";
     const remember = element("input", { type: "checkbox", disabled: summary.aircraftSerial ? null : "" });
     remember.checked = Boolean(summary.aircraftSerial);
@@ -1412,7 +1424,7 @@ function openFlightImport() {
   $("#flight-import-form").reset();
   const select = $("#flight-import-form").elements.aircraftId;
   select.replaceChildren(element("option", { value: "", text: "Automatically match aircraft serials" }),
-    ...state.aircraft.map(aircraft => element("option", { value: aircraft.id, text: aircraft.name })));
+    ...state.aircraft.map(aircraft => element("option", { value: aircraft.id, text: aircraftLabel(aircraft) })));
   select.value = "";
   $("#flight-import-results").replaceChildren();
   openDialog("flight-import");
@@ -1586,6 +1598,7 @@ function openAircraft(aircraft = null) {
   editingAircraftId = aircraft?.id ?? null;
   for (const field of ["name", "kind", "registrationId", "serialNumber", "notes"])
     form.elements[field].value = aircraft?.[field] ?? "";
+  form.elements.status.value = aircraft ? statusOf(aircraft) : "active";
   form.elements.flightRecordSerials.value = (aircraft?.flightRecordSerials ?? []).join("\n");
   $("#aircraft-title").textContent = aircraft ? "Edit aircraft" : "Add an aircraft";
   $("button[type=submit]", form).textContent = aircraft ? "Save aircraft" : "Add aircraft";
@@ -1596,6 +1609,12 @@ $("#edit-aircraft").addEventListener("click", () => openAircraft(selectedAircraf
 $("#import-snapshot").addEventListener("click", openImport);
 $("#new-session").addEventListener("click", () => openSession());
 $("#import-flights").addEventListener("click", openFlightImport);
+$("#fleet-status-filter").addEventListener("change", async event => {
+  fleetStatus = event.target.value;
+  localStorage.setItem("fpvbench.fleetStatus", fleetStatus);
+  detailId = null; flightDetailId = null;
+  await refresh();
+});
 $("#aircraft-select").addEventListener("change", (event) => {
   aircraftId = event.target.value;
   localStorage.setItem("fpvbench.aircraft", aircraftId);
@@ -1667,6 +1686,7 @@ submitForm("aircraft-form", async (form) => {
   const editing = Boolean(editingAircraftId);
   const result = await api(editing ? `/api/aircraft/${encodeURIComponent(editingAircraftId)}` : "/api/aircraft", {
     name: form.elements.name.value,
+    status: form.elements.status.value,
     kind: form.elements.kind.value,
     registrationId: form.elements.registrationId.value,
     serialNumber: form.elements.serialNumber.value,
@@ -1676,7 +1696,7 @@ submitForm("aircraft-form", async (form) => {
   aircraftId = result.id;
   currentView = "overview";
   detailId = null;
-  notify(editing ? "Aircraft details saved." : "Aircraft added. Your workbench is ready.");
+  notify(form.elements.status.value === "retired" ? "Aircraft retired. Its history remains available under Retired aircraft." : editing ? "Aircraft details saved." : "Aircraft added. Your workbench is ready.");
 });
 
 submitForm("import-form", async (form) => {

@@ -9,6 +9,7 @@ import { runDjiJourney } from './dji-journey.mjs';
 import { createBrowserAi } from './test-ai.mjs';
 import { checkEmptyAiSettings, runAiJourney } from './ai-journey.mjs';
 import { runFleetJourney } from './fleet-journey.mjs';
+import { runStatusJourney } from './status-journey.mjs';
 
 // Reuse an existing Playwright installation without adding application dependencies.
 const moduleDir = process.env.FPVBENCH_PLAYWRIGHT_DIR;
@@ -34,8 +35,9 @@ try {
   expect(provider.calls).toHaveLength(0);
   const ai = await runAiJourney({ page, expect, baseURL, provider, experimentText, screenshotDir });
   const fleet = await runFleetJourney({ page, expect, baseURL });
+  const lifecycle = await runStatusJourney({ page, expect, baseURL, baselineText });
   expect((await readdir(dataDir)).some(name => name.startsWith('workspace.sqlite'))).toBe(false);
-  console.log(JSON.stringify({ browser: browser.version(), ...result, dji, ai, fleet, providerCalls: provider.calls.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
+  console.log(JSON.stringify({ browser: browser.version(), ...result, dji, ai, fleet, lifecycle, providerCalls: provider.calls.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
 } finally {
   if (browser) await browser.close();
   if (server?.listening) await new Promise((resolve) => server.close(resolve));

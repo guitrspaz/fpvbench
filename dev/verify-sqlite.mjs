@@ -94,6 +94,26 @@ try {
   store = await openStore(directory); assert.deepEqual(await store.exportWorkspace(), exportBefore); await closeStore(store);
   const restoredDir = join(root, 'restored'); await restoreBackup(restoredDir, exportBefore);
   store = await openStore(restoredDir); assert.deepEqual(await store.exportWorkspace(), exportBefore); await closeStore(store);
+  store = await openStore(restoredDir);
+  assert.equal(store.getState().aircraft[0].status, 'active');
+  await store.updateAircraft(aircraftId, { status: 'retired' });
+  const retiredExport = await store.exportWorkspace();
+  assert.equal(retiredExport.aircraft[0].status, 'retired');
+  assert.deepEqual(retiredExport.snapshots, exportBefore.snapshots);
+  assert.deepEqual(retiredExport.sessions, exportBefore.sessions);
+  assert.deepEqual(retiredExport.flightLogs, exportBefore.flightLogs);
+  await closeStore(store);
+  store = await openStore(restoredDir);
+  assert.equal(store.getState().aircraft[0].status, 'retired');
+  await closeStore(store);
+  await restoreBackup(restoredDir, retiredExport);
+  store = await openStore(restoredDir);
+  assert.deepEqual(await store.exportWorkspace(), retiredExport);
+  await store.updateAircraft(aircraftId, { status: 'active' });
+  await closeStore(store);
+  store = await openStore(restoredDir);
+  assert.equal(store.getState().aircraft[0].status, 'active');
+  await closeStore(store);
   const retryDir = join(root, 'retry'); await mkdir(retryDir); await writeFile(join(retryDir, 'workspace.json'), legacyBytes);
   await assert.rejects(openStore(retryDir, { repositoryFactory: async dir => { const repository = await createSqliteRepository(dir); repository.save = () => { throw new Error('Synthetic migration failure'); }; return repository; } }), /Cannot open workspace/);
   store = await openStore(retryDir); assert.equal(store.getState().snapshots[0].id, snapshotId); await closeStore(store);
@@ -103,7 +123,7 @@ try {
   await assert.rejects(openStore(corruptDir), /Cannot open workspace/); assert.deepEqual(await readFile(join(corruptDir, 'workspace.sqlite')), corruptBytes);
   const unsupportedDir = join(root, 'unsupported'); await mkdir(unsupportedDir); const unsupportedDb = new DatabaseSync(join(unsupportedDir, 'workspace.sqlite')); unsupportedDb.exec('CREATE TABLE unrelated (id INTEGER);'); unsupportedDb.close(); const unchanged = await readFile(join(unsupportedDir, 'workspace.sqlite'));
   await assert.rejects(openStore(unsupportedDir), /Cannot open workspace/); assert.deepEqual(await readFile(join(unsupportedDir, 'workspace.sqlite')), unchanged);
-  console.log('SQLite operational proof passed: v2 exact backup and v3 migration/inbox assignment, schema/FKs, transactions, v1 exact backup and idempotent migration, retry, restart, originals, telemetry, complete restore, corruption rejection, and synthetic local WASM decoding.');
+  console.log('SQLite operational proof passed: v2 exact backup and v3 migration/inbox assignment, schema/FKs, transactions, v1 exact backup and idempotent migration, retry, restart, originals, telemetry, complete restore, aircraft retirement/reactivation with retained history, corruption rejection, and synthetic local WASM decoding.');
 } finally {
   for (const store of stores) await store.close();
   await rm(root, { recursive: true, force: true });

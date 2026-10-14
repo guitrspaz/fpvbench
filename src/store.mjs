@@ -122,7 +122,7 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
       if (!closePromise) { closed = true; closePromise = queue.then(async () => { try { await repository.close(); } finally { await releaseLock(); } }); }
       return closePromise;
     },
-    getState: () => copy({ aircraft: state.aircraft, snapshots: state.snapshots.map(summarizeSnapshot), sessions: state.sessions, flightLogs: state.flightLogs, storage: 'sqlite' }),
+    getState: () => copy({ aircraft: state.aircraft.map(aircraft => ({ ...aircraft, status: aircraft.status ?? 'active' })), snapshots: state.snapshots.map(summarizeSnapshot), sessions: state.sessions, flightLogs: state.flightLogs, storage: 'sqlite' }),
     getSnapshot: id => copy(getRecord(state, 'snapshots', id)),
     getFlightLog: id => copy(getRecord(state, 'flightLogs', id)),
     getFlightOriginal: id => safeOriginal(dataDir, getRecord(state, 'flightLogs', id)),
@@ -146,7 +146,7 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
     },
     createAircraft: input => mutate(next => {
       objectInput(input, aircraftFields.filter(field => field !== 'baselineSnapshotId'));
-      const record = { id: randomUUID(), name: input.name, kind: input.kind ?? '', registrationId: input.registrationId === undefined ? '' : input.registrationId, serialNumber: input.serialNumber === undefined ? '' : input.serialNumber, flightRecordSerials: input.flightRecordSerials === undefined ? [] : input.flightRecordSerials, notes: input.notes ?? '', baselineSnapshotId: null, createdAt: timestamp() };
+      const record = { id: randomUUID(), name: input.name, status: input.status === undefined ? 'active' : input.status, kind: input.kind ?? '', registrationId: input.registrationId === undefined ? '' : input.registrationId, serialNumber: input.serialNumber === undefined ? '' : input.serialNumber, flightRecordSerials: input.flightRecordSerials === undefined ? [] : input.flightRecordSerials, notes: input.notes ?? '', baselineSnapshotId: null, createdAt: timestamp() };
       next.aircraft.push(record); validateAircraft(next, record); return { value: record };
     }),
     updateAircraft: (id, input) => mutate(next => {

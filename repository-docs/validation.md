@@ -25,7 +25,14 @@ node dev/verify-ai.mjs
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.4.1 results — 2026-10-14
+## Observed v0.4.2 results — 2026-10-14
+
+- 121 Jest tests passed across ten suites; ESLint passed. New checks cover default and legacy status, invalid-input atomicity, retirement/reactivation, preserved setup and flight history, API/export status, and retired-aircraft serial routing.
+- 65 browser checks passed using synthetic records, memory repositories, and a fake AI provider. Lifecycle checks cover active-fleet exclusion, retired history access, remembered filters, status labels, reactivation, empty filtered views, and mobile overflow. No unexpected browser errors occurred.
+- Disposable SQLite operational verification passed retirement persistence across restart and complete export/restore, reactivation, and unchanged linked history, alongside existing migration and backup checks.
+- Personal aircraft statuses were not changed by the update. No real paid AI request or external flight upload was used for validation.
+
+## Historical v0.4.1 results — 2026-10-14
 
 - 116 Jest tests passed, including unique modern TXT serial-prefix routing, collisions, exact alias precedence, inbox rematching and JSON/older-version/length restrictions. ESLint passed.
 - Source verification confirmed the pinned decoder’s 16-byte modern aircraft serial field. Serial-prefix examples in tests are synthetic. No personal identifiers or original files are part of the source change.

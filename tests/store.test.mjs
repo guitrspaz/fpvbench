@@ -12,6 +12,44 @@ const rawText = '# dump all\n# Betaflight / TEST 4.5.1 / MSP API: 1.46\nset test
 beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'fpvbench-test-')); repository = createMemoryRepository(); store = await openStore(); aircraft = await store.createAircraft({ name: 'Test quad' }); });
 afterEach(async () => { await store.close(); await rm(dir, { recursive: true, force: true }); });
 
+test('aircraft defaults active, retirement preserves history, and reactivation survives reopening and backups', async () => {
+  expect(aircraft.status).toBe('active');
+  const snapshot = await store.importSnapshot({ aircraftId: aircraft.id, label: 'Reference', filename: 'synthetic.txt', rawText });
+  await store.updateAircraft(aircraft.id, { baselineSnapshotId: snapshot.id });
+  await store.createSession({ aircraftId: aircraft.id, snapshotId: snapshot.id, title: 'Keep my history', flownAt: '2026-10-14T12:00:00Z', notes: 'Preserved observations', confirmedSetup: true });
+  const before = await store.exportWorkspace();
+  await store.updateAircraft(aircraft.id, { status: 'retired' });
+  const retired = await store.exportWorkspace();
+  expect(retired.aircraft[0].status).toBe('retired');
+  expect(retired.snapshots).toEqual(before.snapshots);
+  expect(retired.sessions).toEqual(before.sessions);
+  expect(retired.aircraft[0].baselineSnapshotId).toBe(snapshot.id);
+  expect(validateCompleteBackup(retired).catalog.aircraft[0].status).toBe('retired');
+  await store.close(); store = await openStore();
+  expect(store.getState().aircraft[0].status).toBe('retired');
+  await store.updateAircraft(aircraft.id, { status: 'active' });
+  expect(store.getState().aircraft[0].status).toBe('active');
+});
+
+test('legacy aircraft without a status is treated as active and remains restorable', async () => {
+  const backup = await store.exportWorkspace();
+  delete backup.aircraft[0].status;
+  const { catalog } = validateCompleteBackup(backup);
+  await store.close(); repository.save(catalog); store = await openStore();
+  expect(store.getState().aircraft[0].status).toBe('active');
+  await store.updateAircraft(aircraft.id, { status: 'retired' });
+  expect(store.getState().aircraft[0].status).toBe('retired');
+});
+
+test('invalid aircraft statuses are rejected atomically', async () => {
+  const before = store.getState();
+  for (const status of [null, '', 'broken', 'ACTIVE', 42]) {
+    await expect(store.createAircraft({ name: 'Invalid', status })).rejects.toThrow();
+    await expect(store.updateAircraft(aircraft.id, { status })).rejects.toThrow();
+    expect(store.getState()).toEqual(before);
+  }
+});
+
 test('aircraft identifiers survive editing, reopening and backup, and can be cleared', async () => {
   const made = await store.createAircraft({ name: 'Identifier quad', kind: 'FPV', registrationId: 'FA-SYNTHETIC', serialNumber: 'sn-Synthetic-001' });
   await store.updateAircraft(made.id, { name: 'Renamed quad', notes: 'Updated' });

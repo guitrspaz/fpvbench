@@ -2,7 +2,7 @@
 
 ## Data directory
 
-FPVBench defaults to `~/.fpvbench/` on the computer running the server. Browser storage only remembers the selected aircraft. Set `FPVBENCH_DATA_DIR` to use another local directory.
+FPVBench defaults to `~/.fpvbench/` on the computer running the server. Browser storage remembers the selected aircraft and fleet status filter. Set `FPVBENCH_DATA_DIR` to use another local directory.
 
 `workspace.sqlite` contains the catalog and decoded telemetry. Exact original DJI bytes live in `imports/` under their SHA-256 fingerprints. Keep the whole data directory together when moving it while the server is stopped.
 
@@ -19,6 +19,10 @@ The old JSON file remains in place. Subsequent opens use SQLite, so editing the 
 v0.4 uses SQLite/catalog version 3 so flight records can wait in an inbox without an aircraft. On first opening an existing version 2 database, the app validates its schema, catalog, relationships and telemetry, saves an exact owner-private SQLite backup named workspace-before-v3, then upgrades the flight-log relationship transactionally. IDs, notes, setups, upload status, original files and optional AI settings stay intact. Later opens do not repeat the migration or backup. Invalid data is rejected without resetting it.
 
 The exact SQLite backup preserves the pre-upgrade database. Retain the matching imports directory with it. For ordinary restoration, use the complete JSON export and restore command below; older version 2 exports are validated and converted into the current catalog.
+
+## Active and retired aircraft
+
+v0.4.2 stores an optional aircraft status in its existing SQLite payload. Existing aircraft and older backups without a status are treated as active; no database schema migration is needed. Retiring or reactivating an aircraft preserves its ID, setups, baseline, flight links, serial matching, and AirData status. The status is included in complete exports and preserved on restore. The sidebar filter affects visibility only.
 
 ## Complete export
 
