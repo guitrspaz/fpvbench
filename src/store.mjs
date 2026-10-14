@@ -96,10 +96,16 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
     return work;
   };
   const sessionRecord = input => ({ id: randomUUID(), aircraftId: input.aircraftId, snapshotId: null, flightLogId: null, title: input.title, flownAt: input.flownAt, location: '', durationMinutes: null, battery: '', props: '', conditions: '', notes: '', outcome: 'unrated', mediaRefs: [], confirmedSetup: false, ...input, createdAt: timestamp() });
-  const matchAircraft = (catalog, serial) => {
+  const matchAircraft = (catalog, serial, source = {}) => {
     if (!serial) return [];
     const key = serial.trim().toLowerCase();
-    return catalog.aircraft.filter(aircraft => [aircraft.serialNumber, ...(aircraft.flightRecordSerials ?? [])].some(value => typeof value === 'string' && value.trim() && value.trim().toLowerCase() === key));
+    const identifiers = aircraft => [aircraft.serialNumber, ...(aircraft.flightRecordSerials ?? [])].filter(value => typeof value === 'string' && value.trim()).map(value => value.trim().toLowerCase());
+    const exact = catalog.aircraft.filter(aircraft => identifiers(aircraft).includes(key));
+    if (exact.length) return exact;
+    // The pinned TXT decoder's modern details block has a 16-byte aircraft-SN field.
+    // Only the documented DJI 16/20-character form qualifies; collisions stay ambiguous.
+    if (source.format !== 'dji-txt' || !Number.isInteger(source.logVersion) || source.logVersion < 6 || source.logVersion > 14 || !/^1581f[a-z0-9]{11}$/.test(key)) return [];
+    return catalog.aircraft.filter(aircraft => identifiers(aircraft).some(value => /^1581f[a-z0-9]{15}$/.test(value) && value.startsWith(key)));
   };
   const attachSession = (catalog, log) => {
     const existing = catalog.sessions.find(session => session.flightLogId === log.id);
@@ -167,7 +173,7 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
     matchUnassignedFlightLogs: () => mutate(next => {
       let matched = 0;
       for (const log of next.flightLogs.filter(log => log.aircraftId === null)) {
-        const matches = matchAircraft(next, log.summary.aircraftSerial);
+        const matches = matchAircraft(next, log.summary.aircraftSerial, log);
         if (matches.length !== 1) continue;
         log.aircraftId = matches[0].id; attachSession(next, log); validateFlightLog(next, log); matched++;
       }
@@ -208,7 +214,7 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
       const decoder = decodeFlight ?? (await import('./dji-import.mjs')).decodeDjiFlight;
       const decoded = await decoder(bytes, { filename: input.filename });
       validateFrames(decoded.frames);
-      const matches = matchAircraft(next, decoded.summary.aircraftSerial);
+      const matches = matchAircraft(next, decoded.summary.aircraftSerial, decoded);
       const matchedAircraftId = manualAircraftId ?? (matches.length === 1 ? matches[0].id : null);
       const routing = manualAircraftId !== null ? 'manual' : matchedAircraftId !== null ? 'serial-match' : 'unassigned';
       const log = { id: randomUUID(), aircraftId: matchedAircraftId, filename: input.filename, sourceDevice, importedAt: timestamp(), sha256, byteLength: bytes.length, format: decoded.format, logVersion: decoded.logVersion, status: decoded.status, summary: copy(decoded.summary), frameCount: decoded.frames.length, warnings: copy(decoded.warnings), airdataStatus: 'unknown' };

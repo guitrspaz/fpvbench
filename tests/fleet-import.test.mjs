@@ -8,10 +8,11 @@ import { validateCompleteBackup } from '../src/restore.mjs';
 import { createMemoryRepository } from './helpers/memory-repository.mjs';
 
 let directory, store, repository;
-const decodeFlight = async bytes => normalizeDecodedFlight(JSON.parse(bytes.toString()));
+let decoderFormat = 'dji-json', decoderVersion;
+const decodeFlight = async bytes => { const decoded = normalizeDecodedFlight(JSON.parse(bytes.toString()), decoderFormat); if (decoderVersion !== undefined) decoded.logVersion = decoderVersion; return decoded; };
 const open = () => createStore(directory, { repositoryFactory: () => repository, decodeFlight });
 const payload = (serial, extra = {}) => ({ filename: 'synthetic.json', sourceDevice: 'Same remote for all aircraft', contentBase64: Buffer.from(JSON.stringify({ version: 14, details: { aircraftSn: serial, rcSn: 'SHARED-REMOTE', aircraftName: 'Generic quad', startTime: '2026-10-14T12:00:00Z', totalTime: 60, ...extra }, frames: [] })).toString('base64') });
-beforeEach(async () => { directory = await mkdtemp(join(tmpdir(), 'fpvbench-fleet-')); repository = createMemoryRepository(); store = await open(); });
+beforeEach(async () => { decoderFormat = 'dji-json'; decoderVersion = undefined; directory = await mkdtemp(join(tmpdir(), 'fpvbench-fleet-')); repository = createMemoryRepository(); store = await open(); });
 afterEach(async () => { await store.close(); await rm(directory, { recursive: true, force: true }); });
 
 test('mixed records route by aircraft serial rather than the shared remote or aircraft names', async () => {
@@ -43,6 +44,35 @@ test('ambiguous aircraft serial stays in the inbox', async () => {
   await store.createAircraft({ name: 'First', serialNumber: 'SAME' });
   await store.createAircraft({ name: 'Second', serialNumber: 'same' });
   expect((await store.importFlightLog(payload('SAME'))).flightLog.aircraftId).toBeNull();
+});
+
+test('modern TXT 16-character aircraft serial uniquely matches the full 20-character DJI serial', async () => {
+  decoderFormat = 'dji-txt';
+  const short = '1581F12345678ABC';
+  const aircraft = await store.createAircraft({ name: 'Synthetic DJI', serialNumber: short + 'DEFG' });
+  const imported = await store.importFlightLog(payload(short));
+  expect(imported.flightLog.aircraftId).toBe(aircraft.id);
+  expect(imported.flightLog.summary.aircraftSerial).toBe(short);
+  expect(store.getState().aircraft[0].serialNumber).toBe(short + 'DEFG');
+});
+
+test('truncated TXT prefix collisions remain unassigned and explicit aliases take precedence', async () => {
+  decoderFormat = 'dji-txt';
+  const short = '1581F12345678ABC';
+  await store.createAircraft({ name: 'First', serialNumber: short + 'AAAA' });
+  const second = await store.createAircraft({ name: 'Second', serialNumber: short + 'BBBB' });
+  const imported = await store.importFlightLog(payload(short));
+  expect(imported.flightLog.aircraftId).toBeNull();
+  expect(await store.matchUnassignedFlightLogs()).toEqual({ matched: 0, unassigned: 1 });
+  await store.updateAircraft(second.id, { flightRecordSerials: [short] });
+  expect(await store.matchUnassignedFlightLogs()).toEqual({ matched: 1, unassigned: 0 });
+  expect(store.getFlightLog(imported.flightLog.id).aircraftId).toBe(second.id);
+});
+
+test.each([['dji-json', 14, '1581F12345678ABC'], ['dji-txt', 5, '1581F12345678ABC'], ['dji-txt', 14, 'OTHER123456789ABC'], ['dji-txt', 14, '1581F123456789A']])('partial matching is limited to the documented modern TXT serial field: %s %s %s', async (format, version, short) => {
+  decoderFormat = format; decoderVersion = version;
+  await store.createAircraft({ name: 'Must not guess', serialNumber: short + 'X'.repeat(20 - short.length) });
+  expect((await store.importFlightLog(payload(short))).flightLog.aircraftId).toBeNull();
 });
 
 test('serial aliases entered while creating an aircraft are retained and route imports', async () => {
@@ -121,4 +151,14 @@ test('explicit batch matching attaches older inbox files after adding aircraft w
   expect(store.getState().sessions).toHaveLength(2);
   expect(await store.matchUnassignedFlightLogs()).toEqual({ matched: 0, unassigned: 1 });
   expect(store.getState().sessions).toHaveLength(2);
+});
+
+test('batch rematching uses the documented TXT prefix after adding the full aircraft serial', async () => {
+  decoderFormat = 'dji-txt';
+  const short = '1581F12345678ABC';
+  const imported = await store.importFlightLog(payload(short));
+  expect(imported.flightLog.aircraftId).toBeNull();
+  const aircraft = await store.createAircraft({ name: 'Added later', serialNumber: short + 'DEFG' });
+  expect(await store.matchUnassignedFlightLogs()).toEqual({ matched: 1, unassigned: 0 });
+  expect(store.getFlightLog(imported.flightLog.id).aircraftId).toBe(aircraft.id);
 });

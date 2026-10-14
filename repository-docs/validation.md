@@ -25,7 +25,13 @@ node dev/verify-ai.mjs
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.4 results — 2026-10-14
+## Observed v0.4.1 results — 2026-10-14
+
+- 116 Jest tests passed, including unique modern TXT serial-prefix routing, collisions, exact alias precedence, inbox rematching and JSON/older-version/length restrictions. ESLint passed.
+- Source verification confirmed the pinned decoder’s 16-byte modern aircraft serial field. Serial-prefix examples in tests are synthetic. No personal identifiers or original files are part of the source change.
+- Saved full serials and imported source serials remain unchanged. Manual mappings stay explicit, and distinct aircraft histories are not combined by model name.
+
+## Historical v0.4 results — 2026-10-14
 
 - 109 Jest tests passed across ten suites, including mixed-aircraft serial routing, empty-fleet imports, ambiguity, aliases, assignment/reassignment, batch rematching, dedupe and complete backups. ESLint passed.
 - 56 browser checks passed using synthetic records, memory repositories and a fake AI provider, including mixed bulk import from one source, unassigned review, learned aliases, batch matching and mobile inventory.
