@@ -25,7 +25,14 @@ node dev/verify-ai.mjs
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.4.3 results — 2026-10-14
+## Observed v0.4.4 results — 2026-10-14
+
+- 128 Jest tests passed across eleven suites; ESLint passed. New checks cover duration distribution, rounding, UTC date grouping, missing/zero measurements, tied busiest days, human-readable units, recap-specific provider instructions, optional questions, and withholding unverified modern TXT distance without mutating source data.
+- 72 browser checks passed with synthetic records, memory repositories, and a fake AI provider. Readable highlights, collapsed/expandable facts, omission of empty questions, and mobile recap layout passed alongside previous regression journeys.
+- No real paid AI request was used to validate this revision. Fake-provider checks verify the contract and rendering, not the quality of a live model's narrative.
+- Source inspection found a discrepancy between the pinned decoder's documented metre field and observed modern TXT distance values. No unverified conversion or catalog mutation was made. Recap distance conclusions are withheld pending independent reference verification.
+
+## Historical v0.4.3 results — 2026-10-14
 
 - 123 Jest tests passed across ten suites; ESLint passed. Recap checks cover selected-aircraft imported/manual history, linked-session deduplication, exclusion of other aircraft and inbox records, empty/invalid selection without provider calls, aggregate privacy, and separate caches even for identical labels and facts.
 - 69 browser checks passed with synthetic records, memory repositories, and a fake AI provider. New checks verify the selected recap evidence, clearing the report when switching aircraft, per-aircraft cache reuse, and ignoring a late response after switching. The full run made seven fake provider calls and no real paid requests.

@@ -18,9 +18,13 @@ Missing key, disabled AI, insufficient local allowance, or an unverified/blocked
 
 The **setup assistant** explains explicit tuning settings and differences from the selected aircraft's preferred baseline. You can supply a short flying-goal question. Automatic review is separately opt-in and runs only after a successful setup import; a failed analysis never undoes the import.
 
-The **flight recap** on the overview uses only the **currently selected aircraft**: its imported logs and manual sessions. Ordinary application code computes counts and available durations/distances/heights, avoiding double-counting sessions linked to imported logs. Other aircraft and unassigned records are excluded. Coverage counts show missing measurements. Distance means distance flown, not distance from the pilot. An aircraft with no records cannot generate a recap. This remains a light summary alongside AirData.
+The **flight recap** on the overview uses only the **currently selected aircraft**: its imported logs and manual sessions. Ordinary application code computes total recorded time, average and median duration, shortest/longest duration, entries under one minute, and UTC date range/active days/busiest days, alongside available distance/height measurements. Sessions linked to imported logs are counted once. Other aircraft and unassigned records are excluded. Coverage counts show missing measurements. Distance means distance flown, not distance from the pilot. An aircraft with no records cannot generate a recap. This remains a light summary alongside AirData.
 
 The panel names its aircraft. Switching aircraft clears the displayed recap and does not make a billed request; choose **Create AI flight recap** to generate or retrieve one for the new selection. Retired aircraft can still be selected through the fleet filter and recapped. Requests require the selected aircraft ID (`POST /api/ai/recap` with `{ aircraftId }`); the local ID is not sent to OpenAI.
+
+The recap is instructed to interpret those comparisons in a short pilot-facing summary with a few useful observations. Questions may be empty; they are requested only for a concrete missing datum. Readable duration highlights appear above the explanation. **Computed facts used in this recap** is collapsed by default and can be expanded to inspect the evidence and coverage. Computed numbers are rounded for display.
+
+DJI TXT version 14 summary distances are currently withheld from recap calculations while their units are independently verified. The pinned decoder [documents the header distance as metres](https://github.com/lvauvillier/dji-log-parser/blob/v0.5.7/dji-log-parser/src/layout/details.rs), but observed source values conflict with that label. No conversion is inferred from plausibility. Original files and catalog measurements stay unchanged; decoded JSON metric distances and older TXT handling are unchanged. The recap shows how many distances were withheld and explains the specific concern.
 
 Advice does not establish flightworthiness or generate/apply a controller configuration. Betaflight baseline preferences are user selections, not independently validated tunes. Sparse exports and unfamiliar firmware remain limitations. DJI flight logs do not supply Betaflight-style configuration evidence.
 
@@ -38,7 +42,7 @@ Primary references: [model and pricing](https://developers.openai.com/api/docs/m
 
 Setup review sends a bounded selection of explicit tuning/rates/filter/protocol fields, firmware/profile context, a similarly filtered baseline comparison, your optional question, and a small source glossary. It excludes the original configuration text and unrelated configuration fields.
 
-Flight recap sends only the selected aircraft's aggregate measurements and label. User-entered labels and your question are included, so choose what you want to share. Exact coordinates, locations, original files, component identifiers, session notes, footage references, and raw telemetry are excluded.
+Flight recap sends only the selected aircraft's aggregate measurements, UTC date-grouped activity, and label. Exact flight timestamps are excluded. User-entered labels and your question are included, so choose what you want to share. Exact coordinates, locations, original files, component identifiers, session notes, footage references, and raw telemetry are excluded.
 
 Requests go from the local server to the fixed OpenAI Responses endpoint, with `store: false`. No web-search tool, remote decoding, controller operation, or AirData submission is involved. Setting `store: false` controls response storage; it is not a promise of zero provider retention. See [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data).
 
@@ -48,7 +52,7 @@ The key is stored only by the local server in `.ai-config.json`, an owner-privat
 
 Local AI configuration, spending ledger, and cached reports are separate from the flight/setup catalog and excluded from its JSON export. To preserve those local files, copy the complete data directory while FPVBench is stopped and keep that copy private. The ordinary export remains complete for aircraft, setups, sessions, DJI originals, and telemetry.
 
-Flight recap caches are separate for each aircraft and its computed facts. Unchanged facts reuse that aircraft's report; changes elsewhere in the fleet do not invalidate it. Older whole-workspace recaps are not reused.
+Flight recap caches are separate for each aircraft and its computed facts. Unchanged facts reuse that aircraft's report; changes elsewhere in the fleet do not invalidate it. Older whole-workspace recaps are not reused. The v0.4.4 recap revision also prevents reuse of the earlier mechanical reports; creating the first updated recap makes one new billed request.
 
 Repeated reviews of unchanged evidence and the same question reuse the cached report. Opening a setup retrieves its latest matching saved goal-specific review; changing the baseline or source evidence invalidates that match. Opening a saved report does not make an API request; AI content remains hidden when availability is disabled.
 

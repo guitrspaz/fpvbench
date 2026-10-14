@@ -103,7 +103,19 @@ export async function runAiJourney({ page, expect, baseURL, provider, experiment
   await expect(content.locator('#ai-flight-recap')).toContainText('For ' + recapAircraft.name + '.');
   await content.getByRole('button', { name: 'Create AI flight recap', exact: true }).click();
   await expect(content.getByText('Synthetic aggregate flight recap', { exact: true })).toBeVisible();
-  await expect(content.getByRole('heading', { name: 'Computed facts used in this recap', exact: true })).toBeVisible();
+  const evidence = content.locator('.recap-evidence');
+  await expect(evidence.locator('summary')).toHaveText('Computed facts used in this recap');
+  expect(await evidence.evaluate(node => node.open)).toBe(false);
+  await expect(content.getByLabel('Flight recap highlights')).toContainText('Median flight');
+  await expect(content.getByLabel('Flight recap highlights')).toContainText('Average flight');
+  await expect(content.getByRole('heading', { name: 'Questions to consider', exact: true })).toHaveCount(0);
+  await evidence.locator('summary').click();
+  expect(await evidence.evaluate(node => node.open)).toBe(true);
+  await expect(evidence.locator('.ai-facts').first()).toBeVisible();
+  await evidence.locator('summary').click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   expect(provider.calls).toHaveLength(3);
   expect(provider.calls[2].evidence.facts.flightCount).toBe(expectedCount);
   expect(provider.calls[2].evidence.facts.aircraft).toEqual([{ label: recapAircraft.name, flightCount: expectedCount }]);
@@ -207,5 +219,5 @@ export async function runAiJourney({ page, expect, baseURL, provider, experiment
   expect(externalRequests).toEqual([]);
   page.off('pageerror', onError);
   page.off('console', onConsole);
-  return { passed: ['settings accessible before aircraft', 'default features hidden', 'write-only key and no call on save', 'no key in GET/export/localStorage', 'explicit fake connection check enables features', 'goal review with fixed sources and actual context', 'cached goal review makes no call', 'recap computed facts', 'selected-aircraft recap scope', 'aircraft switch clears recap', 'independent aircraft recap cache', 'late recap response ignored after aircraft switch', 'automatic import review cached', 'quota blocks features without credential leak', 'offline import after quota', 'explicit recovered check', 'zero budget hides cached and new features', 'mobile settings without overflow', 'no unexpected browser errors or external requests'], errors, expectedQuotaErrors };
+  return { passed: ['settings accessible before aircraft', 'default features hidden', 'write-only key and no call on save', 'no key in GET/export/localStorage', 'explicit fake connection check enables features', 'goal review with fixed sources and actual context', 'cached goal review makes no call', 'recap computed facts', 'readable recap highlights', 'collapsed computed evidence', 'optional recap questions omitted', 'selected-aircraft recap scope', 'aircraft switch clears recap', 'independent aircraft recap cache', 'late recap response ignored after aircraft switch', 'automatic import review cached', 'quota blocks features without credential leak', 'offline import after quota', 'explicit recovered check', 'zero budget hides cached and new features', 'mobile settings without overflow', 'no unexpected browser errors or external requests'], errors, expectedQuotaErrors };
 }

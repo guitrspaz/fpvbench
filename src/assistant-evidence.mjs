@@ -90,24 +90,65 @@ export function validateQuestion(question) {
 
 /** Aggregate imported flights and unlinked manual sessions without double counting. */
 export function flightFacts(state) {
-  const records = state.flightLogs.map(log => ({ aircraftId: log.aircraftId, durationSeconds: log.summary.durationSeconds, distanceMeters: log.summary.distanceMeters, maxHeightMeters: log.summary.maxHeightMeters }));
-  const manual = state.sessions.filter(session => !session.flightLogId).map(session => ({ aircraftId: session.aircraftId, durationSeconds: session.durationMinutes === null ? null : session.durationMinutes * 60, distanceMeters: null, maxHeightMeters: null }));
-  records.push(...manual);
+  // The pinned parser labels v14 header distances as metres, but observed values
+  // conflict with that contract. Keep originals/catalog unchanged; withhold these
+  // distances from recap evidence until the source unit is independently verified.
+  const needsDistanceVerification = log => log.format === 'dji-txt' && log.logVersion === 14 && typeof log.summary.distanceMeters === 'number' && Number.isFinite(log.summary.distanceMeters) && log.summary.distanceMeters >= 0;
+  const distanceWithheldFlightCount = state.flightLogs.filter(needsDistanceVerification).length;
+  const records = state.flightLogs.map(log => ({ aircraftId: log.aircraftId, startTime: log.summary.startTime, durationSeconds: log.summary.durationSeconds, distanceMeters: needsDistanceVerification(log) ? null : log.summary.distanceMeters, maxHeightMeters: log.summary.maxHeightMeters }));
+  const manual = state.sessions.filter(session => !session.flightLogId).map(session => ({ aircraftId: session.aircraftId, startTime: session.flownAt, durationSeconds: session.durationMinutes === null ? null : session.durationMinutes * 60, distanceMeters: null, maxHeightMeters: null }));
+  for (const record of manual) records.push(record);
+  const round = value => Math.round(value * 100) / 100;
+  const numeric = field => records.map(record => record[field]).filter(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
   const measurement = (field, reducer) => {
-    const values = records.map(record => record[field]).filter(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
-    return { value: values.length ? reducer(values) : null, coveredFlights: values.length, totalFlights: records.length };
+    const values = numeric(field);
+    return { value: values.length ? round(reducer(values)) : null, coveredFlights: values.length, totalFlights: records.length };
+  };
+  const sum = values => values.reduce((total, value) => total + value, 0);
+  const average = values => sum(values) / values.length;
+  const highest = values => values.reduce((max, value) => Math.max(max, value), 0);
+  const lowest = values => values.reduce((min, value) => Math.min(min, value), Infinity);
+  const median = values => {
+    values.sort((a, b) => a - b);
+    const middle = Math.floor(values.length / 2);
+    return values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
   };
   const countByAircraft = new Map();
   for (const record of records) countByAircraft.set(record.aircraftId, (countByAircraft.get(record.aircraftId) ?? 0) + 1);
   const aircraft = [...countByAircraft].map(([id, flightCount]) => ({ label: state.aircraft.find(item => item.id === id)?.name.slice(0, 80) ?? 'Unassigned aircraft', flightCount })).sort((a, b) => b.flightCount - a.flightCount || a.label.localeCompare(b.label));
+  const dayCounts = new Map();
+  let datedFlights = 0;
+  for (const record of records) {
+    const time = typeof record.startTime === 'string' ? Date.parse(record.startTime) : NaN;
+    if (!Number.isFinite(time)) continue;
+    const day = new Date(time).toISOString().slice(0, 10);
+    dayCounts.set(day, (dayCounts.get(day) ?? 0) + 1); datedFlights++;
+  }
+  const days = [...dayCounts.keys()].sort();
+  const peak = [...dayCounts.values()].reduce((max, count) => Math.max(max, count), 0);
+  const busiestDays = days.filter(day => dayCounts.get(day) === peak).map(date => ({ date, flightCount: peak }));
+  const durations = numeric('durationSeconds');
   return {
     flightCount: records.length, importedFlightCount: state.flightLogs.length, unassignedFlightCount: state.flightLogs.filter(log => log.aircraftId === null).length, unlinkedManualSessionCount: manual.length,
     linkedSessionCount: state.sessions.filter(session => session.flightLogId).length,
-    durationSeconds: measurement('durationSeconds', values => values.reduce((sum, value) => sum + value, 0)),
-    distanceFlownMeters: measurement('distanceMeters', values => values.reduce((sum, value) => sum + value, 0)),
-    longestDistanceFlownMeters: measurement('distanceMeters', values => values.reduce((highest, value) => Math.max(highest, value), 0)),
-    highestRecordedHeightMeters: measurement('maxHeightMeters', values => values.reduce((highest, value) => Math.max(highest, value), 0)),
+    durationSeconds: measurement('durationSeconds', sum),
+    averageDurationSeconds: measurement('durationSeconds', average),
+    medianDurationSeconds: measurement('durationSeconds', median),
+    shortestDurationSeconds: measurement('durationSeconds', lowest),
+    longestDurationSeconds: measurement('durationSeconds', highest),
+    flightsUnderOneMinute: { count: durations.filter(value => value < 60).length, coveredFlights: durations.length, totalFlights: records.length },
+    distanceWithheldFlightCount,
+    distanceFlownMeters: measurement('distanceMeters', sum),
+    averageDistanceFlownMeters: measurement('distanceMeters', average),
+    longestDistanceFlownMeters: measurement('distanceMeters', highest),
+    highestRecordedHeightMeters: measurement('maxHeightMeters', highest),
+    flyingActivity: { firstFlightDate: days[0] ?? null, lastFlightDate: days.at(-1) ?? null, activeDays: days.length, busiestDays: busiestDays.slice(0, 3), busiestDayTieCount: busiestDays.length, coveredFlights: datedFlights, totalFlights: records.length, timezone: 'UTC' },
     aircraft: aircraft.slice(0, 20), omittedAircraftCount: Math.max(0, aircraft.length - 20),
-    limitations: ['These facts cover records imported into FPVBench and unlinked manual sessions only; inventory completeness is unknown.', 'Distance flown is path distance, not distance from the pilot.', 'Missing measurements remain unknown. Aggregate measurements may combine sources with different reference conventions.', 'A session is not proof of a distinct real flight; duplicate manual entries may exist. No causal, safety or DJI tuning conclusions are supported.'],
+    limitations: [
+      'Only this aircraft’s imported records and unlinked manual sessions are covered; inventory completeness is unknown.',
+      'Distance flown is path distance, not distance from the pilot.',
+      ...(distanceWithheldFlightCount ? ['DJI TXT version 14 summary distance units need verification against AirData or another known reference; those distances are withheld from this recap.'] : []),
+      ...(manual.length ? ['Unlinked manual sessions may duplicate an imported record; they are not proof of distinct real flights.'] : []),
+    ],
   };
 }

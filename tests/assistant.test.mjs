@@ -115,6 +115,7 @@ test('recap facts avoid linked-session duplicates, preserve zero/missing coverag
   state.aircraft[0].status = 'retired';
   const report = await assistant.recapFlights('quad-a');
   expect(report.context.aircraftId).toBe('quad-a');
+  expect(report.context.recapVersion).toBe(2);
   expect(report.facts.unassignedFlightCount).toBe(0);
   expect(report.facts.flightCount).toBe(3);
   expect(report.facts.durationSeconds).toEqual({ value: 180, coveredFlights: 3, totalFlights: 3 });
@@ -163,6 +164,45 @@ test('empty recap does not call provider; aggregates large catalogs without argu
   expect(facts.durationSeconds.value).toBeNull();
 });
 
+test('flight facts calculate useful duration distribution and UTC flying activity with readable precision', () => {
+  const facts = flightFacts({
+    aircraft: [{ id: 'a', name: 'Synthetic quad' }],
+    flightLogs: [
+      { id: 'first', aircraftId: 'a', summary: { startTime: '2026-10-10T23:30:00-02:00', durationSeconds: 30.1, distanceMeters: 100.123456, maxHeightMeters: 5 } },
+      { id: 'second', aircraftId: 'a', summary: { startTime: '2026-10-11T12:00:00Z', durationSeconds: 90.2, distanceMeters: 200.234567, maxHeightMeters: 20 } },
+      { id: 'missing', aircraftId: 'a', summary: { startTime: null, durationSeconds: null, distanceMeters: null, maxHeightMeters: null } },
+    ],
+    sessions: [
+      { aircraftId: 'a', flightLogId: 'second', flownAt: '2026-10-11T12:00:00Z', durationMinutes: 99 },
+      { aircraftId: 'a', flightLogId: null, flownAt: '2026-10-12T10:00:00Z', durationMinutes: 3 },
+    ],
+  });
+  expect(facts.durationSeconds).toEqual({ value: 300.3, coveredFlights: 3, totalFlights: 4 });
+  expect(facts.averageDurationSeconds.value).toBe(100.1);
+  expect(facts.medianDurationSeconds.value).toBe(90.2);
+  expect(facts.shortestDurationSeconds.value).toBe(30.1);
+  expect(facts.longestDurationSeconds.value).toBe(180);
+  expect(facts.flightsUnderOneMinute).toEqual({ count: 1, coveredFlights: 3, totalFlights: 4 });
+  expect(facts.averageDistanceFlownMeters.value).toBe(150.18);
+  expect(facts.distanceFlownMeters.value).toBe(300.36);
+  expect(facts.flyingActivity).toEqual({ firstFlightDate: '2026-10-11', lastFlightDate: '2026-10-12', activeDays: 2, busiestDays: [{ date: '2026-10-11', flightCount: 2 }], busiestDayTieCount: 1, coveredFlights: 3, totalFlights: 4, timezone: 'UTC' });
+});
+
+test('flight distribution keeps explicit zero and unknown separate, handles even medians and tied days', () => {
+  const facts = flightFacts({
+    aircraft: [], sessions: [],
+    flightLogs: [0, 60, 120, 180].map((durationSeconds, i) => ({ aircraftId: 'a', summary: { startTime: i < 2 ? '2026-10-10T12:00:00Z' : '2026-10-11T12:00:00Z', durationSeconds, distanceMeters: null, maxHeightMeters: null } })),
+  });
+  expect(facts.medianDurationSeconds.value).toBe(90);
+  expect(facts.shortestDurationSeconds.value).toBe(0);
+  expect(facts.flightsUnderOneMinute.count).toBe(1);
+  expect(facts.flyingActivity.busiestDays).toEqual([{ date: '2026-10-10', flightCount: 2 }, { date: '2026-10-11', flightCount: 2 }]);
+  const empty = flightFacts({ aircraft: [], sessions: [], flightLogs: [] });
+  expect(empty.averageDurationSeconds).toEqual({ value: null, coveredFlights: 0, totalFlights: 0 });
+  expect(empty.flyingActivity.firstFlightDate).toBeNull();
+  expect(empty.flyingActivity.busiestDays).toEqual([]);
+});
+
 test('explicit limitations about flightworthiness remain valid explanations', async () => {
   const { assistant, ai } = harness();
   ai.run.mockResolvedValueOnce({ result: { ...result, limitations: ['I cannot establish whether this is safe to fly.', 'Flightworthiness is unverified.'] } });
@@ -182,4 +222,19 @@ test('fresh responses return the credential-redacted saved record for local cont
   const recap = await assistant.recapFlights('quad-a');
   expect(recap.facts.aircraft[0].label).toBe('[redacted]');
   expect(JSON.stringify(recap)).not.toContain('test-credential');
+});
+
+test('recap withholds unverified modern TXT distances without changing source data or valid JSON coverage', async () => {
+  const { assistant, ai, state } = harness();
+  state.flightLogs = [
+    { id: 'uncertain', aircraftId: 'quad-a', format: 'dji-txt', logVersion: 14, summary: { startTime: '2026-10-10T12:00:00Z', durationSeconds: 90, distanceMeters: 6.419383525848389, maxHeightMeters: 20 } },
+    { id: 'verified', aircraftId: 'quad-a', format: 'dji-json', logVersion: 14, summary: { startTime: '2026-10-11T12:00:00Z', durationSeconds: 120, distanceMeters: 200, maxHeightMeters: 30 } },
+  ];
+  const before = structuredClone(state);
+  const report = await assistant.recapFlights('quad-a');
+  expect(report.facts.distanceFlownMeters).toEqual({ value: 200, coveredFlights: 1, totalFlights: 2 });
+  expect(report.facts.distanceWithheldFlightCount).toBe(1);
+  expect(report.facts.limitations.join(' ')).toMatch(/distance units.*verif/i);
+  expect(JSON.stringify(ai.run.mock.calls[0][1])).not.toContain('6.419383525848389');
+  expect(state).toEqual(before);
 });

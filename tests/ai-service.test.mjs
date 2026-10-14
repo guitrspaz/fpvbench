@@ -180,3 +180,14 @@ test('private report cache survives restart and can retrieve the latest matching
   expect((await ai.findReport(report => report.context.snapshotId === 'example')).generatedAt).toBe('2026-10-14T12:01:00Z');
   expect((await ai.getReport('a'.repeat(64))).result).toEqual(result);
 });
+
+test('recap has its own trusted synthesis instructions and allows no follow-up questions', async () => {
+  await setup();
+  const answer = await ai.run('flight-recap', { facts: { flightCount: 3, averageDurationSeconds: { value: 90 }, medianDurationSeconds: { value: 60 } } });
+  const body = JSON.parse(fetchImpl.mock.calls[1][1].body);
+  expect(body.instructions).toMatch(/average.*median/i);
+  expect(body.instructions).toMatch(/human-readable/i);
+  expect(body.instructions).toMatch(/generic.*questions/i);
+  expect(body.instructions).not.toContain('preferred baseline');
+  expect(answer.result.questions).toEqual([]);
+});

@@ -1,3 +1,5 @@
+import { formatRecapNumber, recapHighlights } from "./recap-format.js";
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const content = $("#content");
 let state = { aircraft: [], snapshots: [], sessions: [], flightLogs: [] };
@@ -1019,7 +1021,14 @@ function aiReportContent(envelope) {
   const report = envelope?.report ?? envelope?.result?.report ?? envelope?.result ?? envelope;
   const output = element("div", { class: "ai-report" });
   if (!report || typeof report.summary !== "string") return output;
-  output.append(element("p", { class: "ai-disclosure", text: "AI-generated explanation · verify against your setup and the referenced documentation." }));
+  const isRecap = envelope.kind === "flight-recap" || Boolean(envelope.facts);
+  output.append(element("p", { class: "ai-disclosure", text: isRecap ? "AI flight summary · based on the recorded evidence below." : "AI-generated explanation · verify against your setup and the referenced documentation." }));
+  if (isRecap && envelope.facts) {
+    const highlights = element("dl", { class: "recap-highlights", "aria-label": "Flight recap highlights" });
+    for (const row of recapHighlights(envelope.facts)) highlights.append(element("div", {}, element("dt", { text: row.label }), element("dd", { text: row.value }), element("small", { text: row.detail })));
+    output.append(highlights);
+    if (envelope.facts.distanceWithheldFlightCount) output.append(element("p", { class: "proof-note", text: `Distance findings are withheld for ${envelope.facts.distanceWithheldFlightCount} TXT records while their source units are verified. Duration and date findings remain available.` }));
+  }
   const context = envelope.context ?? envelope.evidence;
   if (context && typeof context.question === "string") {
     if (context.question.trim()) output.append(
@@ -1058,7 +1067,7 @@ function aiReportContent(envelope) {
     if (list.childElementCount) output.append(element("h3", { text: "Referenced documentation" }), list);
   }
   if (envelope.facts) {
-    output.append(element("h3", { text: "Computed facts used in this recap" }), factsContent(envelope.facts));
+    output.append(element("details", { class: "recap-evidence" }, element("summary", { text: "Computed facts used in this recap" }), factsContent(envelope.facts)));
   }
   return output;
 }
@@ -1072,7 +1081,7 @@ function factsContent(value) {
       element("dt", { text: key.replace(/([a-z])([A-Z])/g, "$1 $2") }), element("dd", {}, factsContent(item))));
     return list;
   }
-  return element("span", { text: String(value) });
+  return element("span", { text: typeof value === "number" ? formatRecapNumber(value) : String(value) });
 }
 
 function snapshotAiPanel(snapshot, revision) {

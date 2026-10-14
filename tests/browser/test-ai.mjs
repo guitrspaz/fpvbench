@@ -16,7 +16,7 @@ export function createBrowserAi() {
     if (quota) return new Response(JSON.stringify({ error: { code: 'insufficient_quota', message: syntheticCredential } }), { status: 429 });
     const summary = input.kind === 'connection-check' ? 'Connected'
       : input.kind === 'flight-recap' ? 'Synthetic aggregate flight recap' : 'Synthetic setup explanation';
-    const result = { summary, observations: ['Explain supplied evidence only.'], questions: ['Which behavior should you verify?'], limitations: ['Sparse values remain unknown.'] };
+    const result = { summary, observations: ['Explain supplied evidence only.'], questions: input.kind === 'flight-recap' ? [] : ['Which behavior should you verify?'], limitations: input.kind === 'flight-recap' ? ['Only imported records are covered.'] : ['Sparse values remain unknown.'] };
     return new Response(JSON.stringify({ status: 'completed', usage: { input_tokens: 100, output_tokens: 50, total_tokens: 150 },
       output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: JSON.stringify(result) }] }],
     }), { status: 200 });
