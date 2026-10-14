@@ -6,7 +6,7 @@ FPVBench defaults to `~/.fpvbench/` on the computer running the server. Browser 
 
 `workspace.sqlite` contains the catalog and decoded telemetry. Exact original DJI bytes live in `imports/` under their SHA-256 fingerprints. Keep the whole data directory together when moving it while the server is stopped.
 
-The app creates its directory and files with owner-only permissions. One live server owns each directory; a second process is rejected. Shut the server down with Ctrl+C before a restore or filesystem copy.
+The app creates its directory and files with owner-only permissions. One live server owns each directory; a second process is rejected. Shut a manual server down with Ctrl+C, or use **Stop FPVBench** / `npm run service:stop` for the macOS background service, before a restore or filesystem copy.
 
 ## Migration from v0.1
 
@@ -55,6 +55,10 @@ The restore validates relationships, original fingerprints, and telemetry before
 If the current workspace is corrupt, retain the entire existing directory and restore into a new empty directory using `FPVBENCH_DATA_DIR`. The command refuses to replace an existing workspace it cannot validate.
 
 Do not replace `workspace.sqlite` with the downloaded JSON or overwrite the legacy `workspace.json` expecting SQLite to reread it. The restore command performs the conversion and keeps originals with their records.
+
+## macOS background service
+
+The optional [macOS startup service](macos-startup.md) uses the same workspace and does not relocate or reset it. Its manifest, launch definition and logs live separately under the user’s Library folders. Uninstalling the service preserves workspace data and optional AI files.
 
 ## Optional AI files
 

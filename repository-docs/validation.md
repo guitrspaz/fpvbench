@@ -25,7 +25,15 @@ node dev/verify-ai.mjs
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.4.4 results — 2026-10-14
+## Observed v0.4.5 results — 2026-10-14
+
+- 134 Jest tests passed across twelve suites; ESLint passed. New checks cover plist/XML and launcher quoting, login/on-demand paths, exact manual-server identity, duplicate-owner refusal, lifecycle ordering, and data-free readiness responses.
+- A separately scoped isolated operational proof registered a temporary user LaunchAgent on a high loopback port with a disposable synthetic workspace. Plist validation, native launcher compilation, background readiness and matching job/lock PID passed. Crash recovery, stop/restart with retained synthetic SQLite history, and clean shutdown passed. The proof job and temporary artifacts were removed.
+- Source tests mock OS/process control; automated tests register no jobs, signal no processes and open no database. No personal records or paid AI requests were used in the isolated proof.
+- Installed-service smoke checks passed idempotent start, the generated Stop/Start/Restart commands, native launcher execution without a duplicate server, readiness, and unchanged catalog contents.
+- Login configuration was verified; an actual logout/login cycle is outside the proof.
+
+## Historical v0.4.4 results — 2026-10-14
 
 - 128 Jest tests passed across eleven suites; ESLint passed. New checks cover duration distribution, rounding, UTC date grouping, missing/zero measurements, tied busiest days, human-readable units, recap-specific provider instructions, optional questions, and withholding unverified modern TXT distance without mutating source data.
 - 72 browser checks passed with synthetic records, memory repositories, and a fake AI provider. Readable highlights, collapsed/expandable facts, omission of empty questions, and mobile recap layout passed alongside previous regression journeys.

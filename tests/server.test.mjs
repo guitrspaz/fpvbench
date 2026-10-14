@@ -23,6 +23,15 @@ const storeFactory = dataDir => createStore(dataDir, { repositoryFactory: create
 beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'fpvbench-api-')); server = await createServer({ dataDir: dir, storeFactory }); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); base = `http://127.0.0.1:${server.address().port}`; });
 afterEach(async () => { await new Promise(resolve => server.close(resolve)); await rm(dir, { recursive: true, force: true }); });
 
+test('service readiness exposes only application identity and version', async () => {
+  const response = await request('/api/health');
+  expect(response.status).toBe(200);
+  const data = await response.json();
+  expect(Object.keys(data).sort()).toEqual(['application', 'version']);
+  expect(data.application).toBe('FPVBench');
+  expect(data.version).toMatch(/^\d+\.\d+\.\d+$/);
+});
+
 test('aircraft identifiers are editable through the API and retained in state and export', async () => {
   const created = await request('/api/aircraft', 'POST', { name: 'Identifier quad', registrationId: 'SYNTHETIC-REG', serialNumber: 'Synthetic-SN' });
   expect(created.status).toBe(201);

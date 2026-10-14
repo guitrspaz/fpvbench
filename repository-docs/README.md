@@ -1,6 +1,7 @@
 # FPVBench documentation
 
 - [Project quickstart](../README.md): start/stop the app and follow the first workflow.
+- [macOS startup](macos-startup.md): login service, clickable controls, updates, and removal.
 - [Betaflight imports](betaflight-imports.md): prepare exports and interpret their limits.
 - [DJI flight imports](dji-flight-imports.md): copied files, summaries, telemetry, and encryption limits.
 - [Optional AI](optional-ai.md): setup assistant, recap, API key, allowance, and privacy.

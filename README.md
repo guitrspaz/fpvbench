@@ -13,7 +13,18 @@ npm ci
 npm start
 ```
 
-Open **http://127.0.0.1:4173**. Leave the terminal running; press **Ctrl+C** in that terminal to stop the server. Start it again with `npm start`. Stored data survives a restart.
+Open **http://127.0.0.1:4173**. In manual mode, leave the terminal running and press **Ctrl+C** to stop it. Stored data survives a restart.
+
+On macOS, install the independent background service once:
+
+```sh
+npm run service:install
+npm run service:open
+```
+
+It starts at login and creates **FPVBench.app** in your home **Applications** folder. Closing a terminal or browser does not stop the service. **FPVBench Controls** in the same folder provides clickable Start, Stop, Restart and Status commands. After source updates, use **Restart FPVBench** or `npm run service:restart`.
+
+Stop a manual server with Ctrl+C before installation; `npm run service:install -- --take-over` can hand off a verified server from this checkout. Use `--no-login` to install background operation without automatic login startup. Once installed, use `npm run service:stop` before running `npm start` or restoring a workspace. See [macOS startup and controls](repository-docs/macos-startup.md).
 
 Core application features and assets run locally without an account or cloud service. Optional AI uses the OpenAI API when you enable it. The DJI decoder is a pinned runtime dependency with embedded WebAssembly.
 
@@ -89,6 +100,8 @@ Automated checks use synthetic inputs and an injected memory repository. A separ
 [Documentation index](repository-docs/README.md) · [Architecture](repository-docs/architecture.md) · [v0.3 scope](repository-docs/scope-v0.3.md)
 
 ## Future work
+
+GitHub Release installation packages with login/background setup choices are planned for an eventual public release.
 
 Direct USB/MSP capture, reviewed controller deployment, encrypted DJI telemetry with user-supplied keys, Blackbox analysis, media uploads, and cloud hosting remain future work.
 

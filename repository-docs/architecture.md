@@ -21,6 +21,7 @@ The interface calls JSON endpoints for aircraft, setup imports/comparison, sessi
 | `src/dji-worker.mjs` | Isolate file decoding from the HTTP event loop. |
 | `src/ai-service.mjs` | Gate optional OpenAI requests, reserve local allowance, validate output, and cache reports. |
 | `src/ai-private-files.mjs` | Read/write owner-private credentials and AI state without following symlinks. |
+| `src/macos-service.mjs` | Generate and manage per-user macOS launch artifacts, clickable controls, readiness and verified manual-server handoff. |
 | `src/assistant.mjs` | Assemble actual setup/baseline context, cache explanations, and provide flight recaps. |
 | `src/assistant-evidence.mjs` | Filter explicit tuning fields and calculate aggregate flight facts. |
 | `src/assistant-glossary.mjs` | Supply fixed source-attributed Betaflight guidance. |

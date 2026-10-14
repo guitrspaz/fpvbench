@@ -1,6 +1,6 @@
 {
   "name": "fpvbench",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "private": true,
   "type": "module",
   "description": "A local workbench for FPV setup history and flight-session records.",
@@ -14,7 +14,14 @@
     "lint": "eslint src public tests dev eslint.config.mjs jest.config.mjs",
     "check": "npm run lint && npm test",
     "test:browser": "node tests/browser/run.mjs",
-    "restore": "node src/restore.mjs"
+    "restore": "node src/restore.mjs",
+    "service:install": "node src/macos-service.mjs install",
+    "service:start": "node src/macos-service.mjs start",
+    "service:stop": "node src/macos-service.mjs stop",
+    "service:restart": "node src/macos-service.mjs restart",
+    "service:status": "node src/macos-service.mjs status",
+    "service:open": "node src/macos-service.mjs open",
+    "service:uninstall": "node src/macos-service.mjs uninstall"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -17,6 +17,7 @@ const examplesDefault = resolve(
 );
 const BODY_LIMIT = 1536 * 1024;
 const FLIGHT_BODY_LIMIT = 36 * 1024 * 1024;
+const applicationVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version;
 const CSP =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 const types = {
@@ -201,6 +202,8 @@ export async function createServer({
         }
         throw new AppError("API route was not found.", 404);
       }
+      if (req.method === "GET" && path === "/api/health")
+        return json(res, 200, { application: "FPVBench", version: applicationVersion });
       if (req.method === "GET" && path === "/api/state")
         return json(res, 200, store.getState());
       if (req.method === "GET" && path === "/api/export")
