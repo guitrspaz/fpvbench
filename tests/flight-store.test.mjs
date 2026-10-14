@@ -26,7 +26,7 @@ test('imports original bytes, derived session and paginated telemetry; backups a
   expect(await store.getFlightLogRaw(result.flightLog.id)).toEqual(bytes);
   expect(await store.getFlightLogFrames(result.flightLog.id, 0, 100)).toMatchObject({ frames, total: 1 });
   const backup = await store.exportWorkspace();
-  expect(backup).toMatchObject({ version: 2, originals: [{ flightLogId: result.flightLog.id, contentBase64: bytes.toString('base64') }], telemetry: [{ flightLogId: result.flightLog.id, frames }] });
+  expect(backup).toMatchObject({ version: 3, originals: [{ flightLogId: result.flightLog.id, contentBase64: bytes.toString('base64') }], telemetry: [{ flightLogId: result.flightLog.id, frames }] });
   expect(store.getState()).toMatchObject({ storage: 'sqlite', flightLogs: [result.flightLog] });
 });
 test('dedupe survives rename and preserves editable notes; cross-aircraft duplicates rejected', async () => {

@@ -99,9 +99,9 @@ export function flightFacts(state) {
   };
   const countByAircraft = new Map();
   for (const record of records) countByAircraft.set(record.aircraftId, (countByAircraft.get(record.aircraftId) ?? 0) + 1);
-  const aircraft = [...countByAircraft].map(([id, flightCount]) => ({ label: state.aircraft.find(item => item.id === id)?.name.slice(0, 80) ?? 'Unknown aircraft', flightCount })).sort((a, b) => b.flightCount - a.flightCount || a.label.localeCompare(b.label));
+  const aircraft = [...countByAircraft].map(([id, flightCount]) => ({ label: state.aircraft.find(item => item.id === id)?.name.slice(0, 80) ?? 'Unassigned aircraft', flightCount })).sort((a, b) => b.flightCount - a.flightCount || a.label.localeCompare(b.label));
   return {
-    flightCount: records.length, importedFlightCount: state.flightLogs.length, unlinkedManualSessionCount: manual.length,
+    flightCount: records.length, importedFlightCount: state.flightLogs.length, unassignedFlightCount: state.flightLogs.filter(log => log.aircraftId === null).length, unlinkedManualSessionCount: manual.length,
     linkedSessionCount: state.sessions.filter(session => session.flightLogId).length,
     durationSeconds: measurement('durationSeconds', values => values.reduce((sum, value) => sum + value, 0)),
     distanceFlownMeters: measurement('distanceMeters', values => values.reduce((sum, value) => sum + value, 0)),

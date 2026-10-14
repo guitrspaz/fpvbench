@@ -2,7 +2,7 @@
 
 A local workbench for remembering FPV setups and learning from flight sessions.
 
-Import Betaflight configuration exports, preserve setup history, compare changes, and connect flight observations to the setup used. Import copied DJI flight records to fill in session details. v0.3 stores your workspace in SQLite and offers an optional OpenAI assistant.
+Import Betaflight configuration exports, preserve setup history, compare changes, and connect flight observations to the setup used. Import copied DJI flight records to fill in session details. v0.4 stores your workspace in SQLite and offers an optional OpenAI assistant.
 
 ## Start and stop
 
@@ -34,13 +34,15 @@ Each setting retains its scope and PID/rate profile. A missing value in a sparse
 
 ## DJI flight imports
 
-Select an aircraft and choose **Import DJI flights**. Select one or multiple copied DJI flight-record TXT files or supported decoded JSON exports. You can label the source device, such as DJI RC, DJI RC2, or DJI Goggles N3.
+Choose **Import DJI flights**. Automatic assignment is the default: each file is matched using its aircraft serial, independently of the selected aircraft or shared controller/goggles. Unknown or ambiguous aircraft go into an **Unassigned** inbox. To import a known single-aircraft batch manually, choose its aircraft in the import dialog. Select one or multiple copied DJI flight-record TXT files or supported decoded JSON exports. You can label the source device, such as DJI RC, DJI RC2, or DJI Goggles N3.
 
-Each successful import retains the exact original file and creates a session when a valid flight timestamp is available. Imported measurements remain separate from editable observations and setup confirmation. Reimporting identical bytes for the same aircraft reuses the existing record.
+Each successful import retains the exact original file. Matched aircraft with valid flight timestamps get linked sessions; inbox records get sessions when you assign them. Imported measurements remain separate from editable observations and setup confirmation. Reimporting identical bytes for the same aircraft reuses the existing record.
 
 Newer DJI records encrypt detailed telemetry. FPVBench imports the available unencrypted summary and labels the result **summary only**. It makes no external keychain request. Older records and decoded JSON may supply local telemetry. Device names alone do not establish format compatibility; DAT files and arbitrary JSON are unsupported.
 
 Each record also has a manual **AirData status**: not recorded, not uploaded, or uploaded. Change it after uploads you perform in AirData and filter the library by status. Existing upload history is not guessed.
+
+Use the library’s **All aircraft**, **Selected aircraft**, and **Unassigned** filters. Open an unassigned record to choose its aircraft and optionally remember the recorded serial for future imports, without overwriting the aircraft’s hardware serial. **Match unassigned flights** applies unique serial matches to the remaining inbox. Changing a flight’s aircraft retains its observations and AirData status and clears setup links from the previous aircraft.
 
 See [DJI flight imports](repository-docs/dji-flight-imports.md) for formats, measurements, and limits.
 
@@ -68,7 +70,7 @@ Set `FPVBENCH_DATA_DIR` to use a different local directory. Set `PORT` to choose
 FPVBENCH_DATA_DIR=/path/to/local/fpvbench-data PORT=4174 npm start
 ```
 
-Use **Export workspace** to download a complete version 2 JSON backup, including original DJI bytes and decoded telemetry. Restore instructions are in [storage and backups](repository-docs/storage-and-backups.md). Keep backups private: flight files can contain locations and device identifiers.
+Use **Export workspace** to download a complete version 3 JSON backup (version 2 backups remain restorable), including original DJI bytes and decoded telemetry. Restore instructions are in [storage and backups](repository-docs/storage-and-backups.md). Keep backups private: flight files can contain locations and device identifiers.
 
 Media references are text notes, paths, or URLs; media files are not uploaded. The server is intended for one workstation.
 

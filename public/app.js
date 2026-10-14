@@ -8,6 +8,7 @@ let editingSessionId = null;
 let editingAircraftId = null;
 let editingFlightLogId = null;
 let flightDetailId = null;
+let flightScope = "all";
 let renderRevision = 0;
 let fileRevision = 0;
 let fileReading = false;
@@ -113,7 +114,7 @@ async function refresh() {
   selector.value = aircraftId;
   $("#import-snapshot").disabled = !aircraftId;
   $("#new-session").disabled = !aircraftId;
-  $("#import-flights").disabled = !aircraftId;
+  $("#import-flights").disabled = false;
   $("#edit-aircraft").disabled = !aircraftId;
   await render();
 }
@@ -204,7 +205,7 @@ async function render() {
   const [eyebrow, title, description] = viewCopy[currentView];
   $("#page-eyebrow").textContent = eyebrow;
   $("#page-title").textContent = title;
-  $("#page-description").textContent = selectedAircraft() && currentView !== "settings"
+  $("#page-description").textContent = selectedAircraft() && !["settings", "flights"].includes(currentView)
     ? `${selectedAircraft().name} · ${description}`
     : description;
   $("#breadcrumb").textContent =
@@ -217,7 +218,7 @@ async function render() {
   });
   $(".heading-actions").hidden = currentView === "settings";
   if (currentView === "settings") return showSettings();
-  if (!aircraftId) return showOnboarding();
+  if (currentView !== "flights" && !aircraftId) return showOnboarding();
   if (currentView === "overview") showOverview();
   if (currentView === "history") {
     if (detailId && snapshots().some((item) => item.id === detailId))
@@ -227,7 +228,7 @@ async function render() {
   if (currentView === "compare") showCompare(revision);
   if (currentView === "sessions") showSessions();
   if (currentView === "flights") {
-    if (flightDetailId && flightLogs().some(item => item.id === flightDetailId)) await showFlightDetail(flightDetailId, revision);
+    if (flightDetailId && (state.flightLogs || []).some(item => item.id === flightDetailId)) await showFlightDetail(flightDetailId, revision);
     else showFlightLogs();
   }
 }
@@ -1216,7 +1217,7 @@ function showSessions() {
 }
 
 function flightLogs() {
-  return (state.flightLogs || []).filter(item => item.aircraftId === aircraftId)
+  return (state.flightLogs || []).filter(item => flightScope === "all" || (flightScope === "unassigned" ? item.aircraftId === null : item.aircraftId === aircraftId))
     .sort((a, b) => new Date(b.importedAt) - new Date(a.importedAt));
 }
 
@@ -1240,11 +1241,17 @@ function airdataBadge(log) {
 
 function showFlightLogs() {
   const logs = flightLogs();
-  if (!logs.length) return content.replaceChildren(empty("Bring your flight records into the workbench",
+  if (!(state.flightLogs || []).length) return content.replaceChildren(empty("Bring your flight records into the workbench",
     "Import copied DJI TXT records or compatible decoded JSON. Original bytes are preserved, and available flight details populate a session without retyping.",
     openFlightImport, "↑ Import DJI flights"));
   const panel = element("section", { class: "panel" }, panelHeading(`${logs.length} imported ${logs.length === 1 ? "flight" : "flights"}`,
     "Flight details remain separate from your editable session observations."));
+  const scope = element("select", { "aria-label": "Filter aircraft assignment" },
+    element("option", { value: "all", text: "All aircraft" }),
+    element("option", { value: "selected", text: "Selected aircraft", disabled: !aircraftId ? "" : null }),
+    element("option", { value: "unassigned", text: `Unassigned (${state.flightLogs.filter(log => log.aircraftId === null).length})` }));
+  scope.value = flightScope;
+  scope.addEventListener("change", () => { flightScope = scope.value; showFlightLogs(); });
   const filter = element("select", { "aria-label": "Filter AirData upload status", id: "airdata-status-filter" },
     element("option", { value: "", text: "All AirData statuses" }),
     ...Object.entries(airdataLabels).map(([value, text]) => element("option", { value, text })));
@@ -1255,12 +1262,20 @@ function showFlightLogs() {
     count.textContent = `${selected.length} of ${logs.length} flights`;
     rows.replaceChildren(...selected.map(log => element("div", { class: "item-row" },
     element("div", {}, button(log.filename, () => viewFlight(log.id), "item-title"),
-      element("p", { class: "item-meta", text: `${log.summary.startTime ? date(log.summary.startTime, true) : "Flight date unavailable"} · ${log.sourceDevice || "Source device not recorded"} · Version ${log.logVersion}` })),
-    element("div", { class: "row-actions" }, flightStatus(log), airdataBadge(log), button("Inspect →", () => viewFlight(log.id), "text-button")))));
+      element("p", { class: "item-meta", text: `${log.summary.startTime ? date(log.summary.startTime, true) : "Flight date unavailable"} · ${log.sourceDevice || "Source device not recorded"} · ${state.aircraft.find(aircraft => aircraft.id === log.aircraftId)?.name || "Unassigned"} · Version ${log.logVersion}` })),
+    element("div", { class: "row-actions" }, log.aircraftId === null ? badge("UNASSIGNED", "amber") : null, flightStatus(log), airdataBadge(log), button("Inspect →", () => viewFlight(log.id), "text-button")))));
     if (!selected.length) rows.append(element("p", { class: "muted", text: "No imports match this AirData status." }));
   };
   filter.addEventListener("change", update);
-  panel.append(element("div", { class: "toolbar" }, filter), count, rows);
+  const match = button("Match unassigned flights", async event => {
+    const target = event.currentTarget; target.disabled = true;
+    try {
+      const result = await api("/api/flight-logs/match-unassigned", {});
+      notify(`${result.matched} assigned · ${result.unassigned} still unassigned.`); await refresh();
+    } catch (error) { notify(error.message, true); target.disabled = false; }
+  });
+  match.disabled = !state.flightLogs.some(log => log.aircraftId === null);
+  panel.append(element("div", { class: "toolbar" }, scope, filter, match), count, rows);
   update();
   content.replaceChildren(panel);
 }
@@ -1274,9 +1289,9 @@ async function showFlightDetail(id, revision) {
   content.replaceChildren(element("p", { class: "loading", text: "Loading flight details…" }));
   try {
     const log = await api(`/api/flight-logs/${encodeURIComponent(id)}`);
-    if (revision !== renderRevision || log.aircraftId !== aircraftId) return;
+    if (revision !== renderRevision) return;
     const summary = log.summary;
-    const linkedSession = sessions().find(item => item.flightLogId === log.id);
+    const linkedSession = state.sessions.find(item => item.flightLogId === log.id);
     const actions = element("div", { class: "detail-actions" },
       element("a", { class: "secondary", href: `/api/flight-logs/${encodeURIComponent(id)}/raw`, download: "", text: "↓ Original flight record" }),
       linkedSession ? button("Edit session notes", () => openSession(linkedSession), "primary") : null);
@@ -1296,6 +1311,8 @@ async function showFlightDetail(id, revision) {
       ["Maximum horizontal speed", metric(summary.maxHorizontalSpeedMps, "m/s")],
       ["Aircraft name", summary.aircraftName || "Not available"],
       ["Aircraft model", summary.aircraftModel || "Not available"],
+      ["Recorded aircraft serial", summary.aircraftSerial || "Not available"],
+      ["Assigned aircraft", state.aircraft.find(aircraft => aircraft.id === log.aircraftId)?.name || "Unassigned"],
       ["Location", summary.location || "Not available"],
       ["Start coordinate", summary.startCoordinate
         ? `${metric(summary.startCoordinate.latitude, "", 6)}, ${metric(summary.startCoordinate.longitude, "", 6)}` : "Not available"],
@@ -1303,6 +1320,27 @@ async function showFlightDetail(id, revision) {
     ].forEach(([label, value]) => properties.append(element("div", {}, element("dt", { text: label }), element("dd", { text: value }))));
     panel.append(properties,
       element("p", { class: "proof-note", text: "Values are sourced from this flight record. Unavailable fields stay unknown. Telemetry does not describe or confirm Betaflight settings." }));
+    const assignment = element("select", { "aria-label": "Assign flight to aircraft" },
+      element("option", { value: "", text: "Choose an aircraft" }),
+      ...state.aircraft.map(aircraft => element("option", { value: aircraft.id, text: aircraft.name })));
+    assignment.value = log.aircraftId || "";
+    const remember = element("input", { type: "checkbox", disabled: summary.aircraftSerial ? null : "" });
+    remember.checked = Boolean(summary.aircraftSerial);
+    const assign = button("Save aircraft assignment", async event => {
+      if (!assignment.value) return notify("Add or choose an aircraft first.", true);
+      const target = event.currentTarget; target.disabled = true; assignment.disabled = true; remember.disabled = true;
+      try {
+        await api(`/api/flight-logs/${encodeURIComponent(id)}`, { aircraftId: assignment.value, rememberAircraft: remember.checked }, "PATCH");
+        notify("Aircraft assignment saved."); await refresh();
+      } catch (error) { notify(error.message, true); target.disabled = false; assignment.disabled = false; remember.disabled = !summary.aircraftSerial; }
+    });
+    assign.disabled = !state.aircraft.length;
+    panel.append(element("div", { class: "airdata-tracker" },
+      element("h3", { text: "Aircraft assignment" }),
+      element("p", { class: "form-help", text: "Choose the aircraft this record belongs to. Changing aircraft clears the linked setup selection and confirmation; session notes remain." }),
+      element("div", { class: "toolbar" }, assignment, assign),
+      element("label", { class: "checkbox-label" }, remember, element("span", { text: "Remember this record’s aircraft serial for future imports" })),
+      !state.aircraft.length ? button("+ Add aircraft", () => openAircraft(), "text-button") : null));
     const airdataSelect = element("select", { id: "flight-airdata-status", "aria-label": "AirData upload status" },
       ...Object.entries(airdataLabels).map(([value, text]) => element("option", { value, text })));
     airdataSelect.value = log.airdataStatus || "unknown";
@@ -1324,7 +1362,7 @@ async function showFlightDetail(id, revision) {
       element("h3", { text: "AirData upload tracking" }),
       element("p", { class: "form-help", text: "Track uploads you perform in AirData. This status is your manual record; importing here does not upload or verify anything in AirData." }),
       element("div", { class: "toolbar" }, element("label", {}, "AirData upload status", airdataSelect), saveStatus)));
-    if (!linkedSession) panel.append(element("p", { class: "warning-box", text: "No session was created because the flight start date was unavailable. This original record is saved; you can create a manual session from Flight sessions." }));
+    if (!linkedSession) panel.append(element("p", { class: "warning-box", text: log.aircraftId === null ? "This record is saved in the unassigned inbox. Choose an aircraft above; a dated session will be created when a valid flight start time is available." : "No session was created because the flight start date was unavailable. This original record is saved; you can create a manual session from Flight sessions." }));
     const framesPanel = element("section", { class: "panel" }, panelHeading("Local telemetry", log.status === "summary-only"
       ? "Telemetry is unavailable for this record; the readable details above remain useful."
       : "Browse available normalized frames. No remote map tiles or external requests."));
@@ -1371,8 +1409,11 @@ async function showFlightDetail(id, revision) {
 }
 
 function openFlightImport() {
-  if (!aircraftId) return;
   $("#flight-import-form").reset();
+  const select = $("#flight-import-form").elements.aircraftId;
+  select.replaceChildren(element("option", { value: "", text: "Automatically match aircraft serials" }),
+    ...state.aircraft.map(aircraft => element("option", { value: aircraft.id, text: aircraft.name })));
+  select.value = "";
   $("#flight-import-results").replaceChildren();
   openDialog("flight-import");
 }
@@ -1389,7 +1430,7 @@ $("#flight-import-form").addEventListener("submit", async event => {
   const form = event.currentTarget;
   const files = [...form.elements.files.files];
   if (!files.length) return;
-  const importAircraftId = aircraftId;
+  const importAircraftId = form.elements.aircraftId.value;
   const sourceDevice = form.elements.sourceDevice.value;
   const submit = $("button[type=submit]", form);
   const results = $("#flight-import-results");
@@ -1399,6 +1440,7 @@ $("#flight-import-form").addEventListener("submit", async event => {
   submit.disabled = true;
   form.elements.files.disabled = true;
   form.elements.sourceDevice.disabled = true;
+  form.elements.aircraftId.disabled = true;
   let saved = 0;
   let failed = 0;
   try {
@@ -1409,10 +1451,11 @@ $("#flight-import-form").addEventListener("submit", async event => {
       try {
         if (file.size > 25 * 1024 * 1024) throw new Error("File exceeds the 25 MiB limit.");
         const bytes = new Uint8Array(await file.arrayBuffer());
-        const result = await api("/api/flight-logs", { aircraftId: importAircraftId, filename: file.name, sourceDevice, contentBase64: bytesToBase64(bytes) });
+        const result = await api("/api/flight-logs", { ...(importAircraftId ? { aircraftId: importAircraftId } : {}), filename: file.name, sourceDevice, contentBase64: bytesToBase64(bytes) });
         saved++;
         row.append(badge(result.duplicate ? "ALREADY IMPORTED" : "SAVED", "green"),
-          element("p", { text: `${result.flightLog.status === "decoded" ? "Decoded telemetry" : "Summary only"} · ${result.session ? "Linked flight session available" : "Saved without a session; flight date unavailable"}` }),
+          badge(result.flightLog.aircraftId === null ? "UNASSIGNED" : state.aircraft.find(aircraft => aircraft.id === result.flightLog.aircraftId)?.name || "Assigned aircraft", result.flightLog.aircraftId === null ? "amber" : "green"),
+          element("p", { text: `${result.flightLog.status === "decoded" ? "Decoded telemetry" : "Summary only"} · ${result.flightLog.aircraftId === null ? "Saved in the inbox for later aircraft assignment" : result.session ? "Linked flight session available" : "Saved without a session; flight date unavailable"}` }),
           warningBox(result.flightLog.warnings));
       } catch (error) {
         failed++;
@@ -1420,6 +1463,7 @@ $("#flight-import-form").addEventListener("submit", async event => {
       }
     }
     currentView = "flights";
+    flightScope = "all";
     flightDetailId = null;
     await refresh();
     results.prepend(element("p", { class: "batch-summary", text: `${saved} saved or already imported · ${failed} failed. Successful imports are retained.` }));
@@ -1431,6 +1475,7 @@ $("#flight-import-form").addEventListener("submit", async event => {
     submit.textContent = "Import selected flights";
     form.elements.files.disabled = false;
     form.elements.sourceDevice.disabled = false;
+    form.elements.aircraftId.disabled = false;
   }
 });
 
@@ -1541,6 +1586,7 @@ function openAircraft(aircraft = null) {
   editingAircraftId = aircraft?.id ?? null;
   for (const field of ["name", "kind", "registrationId", "serialNumber", "notes"])
     form.elements[field].value = aircraft?.[field] ?? "";
+  form.elements.flightRecordSerials.value = (aircraft?.flightRecordSerials ?? []).join("\n");
   $("#aircraft-title").textContent = aircraft ? "Edit aircraft" : "Add an aircraft";
   $("button[type=submit]", form).textContent = aircraft ? "Save aircraft" : "Add aircraft";
   openDialog("aircraft");
@@ -1624,6 +1670,7 @@ submitForm("aircraft-form", async (form) => {
     kind: form.elements.kind.value,
     registrationId: form.elements.registrationId.value,
     serialNumber: form.elements.serialNumber.value,
+    flightRecordSerials: form.elements.flightRecordSerials.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
     notes: form.elements.notes.value,
   }, editing ? "PATCH" : "POST");
   aircraftId = result.id;

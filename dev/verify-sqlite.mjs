@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { createStore } from '../src/store.mjs';
-import { createSqliteRepository } from '../src/sqlite-repository.mjs';
+import { createSqliteRepository, legacySchema } from '../src/sqlite-repository.mjs';
 import { parseExport } from '../src/parser.mjs';
 import { restoreBackup } from '../src/restore.mjs';
 import { decodeDjiFlight } from '../src/dji-import.mjs';
@@ -55,6 +55,33 @@ try {
   db.exec('BEGIN;'); db.prepare('INSERT INTO aircraft(id,payload) VALUES(?,?)').run(randomUUID(), '{}'); db.exec('ROLLBACK;');
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM aircraft').get().count, countBefore);
   db.close();
+  // Explicit disposable v2 fixture: retain payloads and exact originals through the v3 upgrade.
+  const v2dir = join(root, 'v2-upgrade'); await mkdir(v2dir); await mkdir(join(v2dir, 'imports'));
+  const v2db = new DatabaseSync(join(v2dir, 'workspace.sqlite')); v2db.exec(legacySchema); v2db.exec('BEGIN IMMEDIATE;');
+  for (const aircraft of exportBefore.aircraft) v2db.prepare('INSERT INTO aircraft(id,baseline_snapshot_id,payload) VALUES(?,?,?)').run(aircraft.id, aircraft.baselineSnapshotId, JSON.stringify(aircraft));
+  for (const snapshot of exportBefore.snapshots) v2db.prepare('INSERT INTO snapshots(id,aircraft_id,payload) VALUES(?,?,?)').run(snapshot.id, snapshot.aircraftId, JSON.stringify(snapshot));
+  for (const log of exportBefore.flightLogs) v2db.prepare('INSERT INTO flight_logs(id,aircraft_id,sha256,payload) VALUES(?,?,?,?)').run(log.id, log.aircraftId, log.sha256, JSON.stringify(log));
+  for (const session of exportBefore.sessions) v2db.prepare('INSERT INTO sessions(id,aircraft_id,snapshot_id,flight_log_id,payload) VALUES(?,?,?,?,?)').run(session.id, session.aircraftId, session.snapshotId, session.flightLogId, JSON.stringify(session));
+  for (const group of exportBefore.telemetry) for (const [sequence, frame] of group.frames.entries()) v2db.prepare('INSERT INTO telemetry_frames VALUES(?,?,?)').run(group.flightLogId, sequence, JSON.stringify(frame));
+  v2db.exec("UPDATE metadata SET value='1' WHERE key='initialized'; COMMIT;"); v2db.close();
+  for (const original of exportBefore.originals) {
+    const log = exportBefore.flightLogs.find(log => log.id === original.flightLogId);
+    await writeFile(join(v2dir, 'imports', `${log.sha256}.bin`), Buffer.from(original.contentBase64, 'base64'), { mode: 0o600 });
+  }
+  const v2bytes = await readFile(join(v2dir, 'workspace.sqlite'));
+  let upgraded = await openStore(v2dir);
+  assert.deepEqual(await upgraded.exportWorkspace(), exportBefore);
+  const v2backups = (await readdir(v2dir)).filter(name => name.startsWith('workspace-before-v3-'));
+  assert.equal(v2backups.length, 1); assert.deepEqual(await readFile(join(v2dir, v2backups[0])), v2bytes);
+  const unknownBytes = Buffer.from(JSON.stringify(decodedDjiFixture({ details: { ...decodedDjiFixture().details, aircraftSn: 'SYNTHETIC-O4' } })));
+  const unknown = await upgraded.importFlightLog({ filename: 'synthetic-inbox.json', contentBase64: unknownBytes.toString('base64') });
+  assert.equal(unknown.flightLog.aircraftId, null); assert.equal(unknown.session, null);
+  await upgraded.updateFlightLog(unknown.flightLog.id, { aircraftId, rememberAircraft: true });
+  assert.equal(upgraded.getFlightLog(unknown.flightLog.id).aircraftId, aircraftId);
+  const v3export = await upgraded.exportWorkspace(); await closeStore(upgraded);
+  upgraded = await openStore(v2dir); assert.deepEqual(await upgraded.exportWorkspace(), v3export);
+  assert.equal((await readdir(v2dir)).filter(name => name.startsWith('workspace-before-v3-')).length, 1); await closeStore(upgraded);
+
   store = await openStore(directory);
   assert.equal(store.getState().sessions.find(session => session.id === imported.session.id).notes, 'Manual note retained');
   assert.deepEqual(await store.exportWorkspace(), exportBefore);
@@ -76,7 +103,7 @@ try {
   await assert.rejects(openStore(corruptDir), /Cannot open workspace/); assert.deepEqual(await readFile(join(corruptDir, 'workspace.sqlite')), corruptBytes);
   const unsupportedDir = join(root, 'unsupported'); await mkdir(unsupportedDir); const unsupportedDb = new DatabaseSync(join(unsupportedDir, 'workspace.sqlite')); unsupportedDb.exec('CREATE TABLE unrelated (id INTEGER);'); unsupportedDb.close(); const unchanged = await readFile(join(unsupportedDir, 'workspace.sqlite'));
   await assert.rejects(openStore(unsupportedDir), /Cannot open workspace/); assert.deepEqual(await readFile(join(unsupportedDir, 'workspace.sqlite')), unchanged);
-  console.log('SQLite operational proof passed: schema/FKs, transactions, v1 exact backup and idempotent migration, retry, restart, originals, telemetry, complete restore, corruption rejection, and synthetic local WASM decoding.');
+  console.log('SQLite operational proof passed: v2 exact backup and v3 migration/inbox assignment, schema/FKs, transactions, v1 exact backup and idempotent migration, retry, restart, originals, telemetry, complete restore, corruption rejection, and synthetic local WASM decoding.');
 } finally {
   for (const store of stores) await store.close();
   await rm(root, { recursive: true, force: true });

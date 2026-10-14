@@ -27,10 +27,10 @@ test('review sends only explicit allowlisted bounded evidence and actual same-ai
   const old = snapshot('baseline', 'set p_roll = 40\nset roll_expo = 15');
   const current = snapshot('current', 'set p_roll = 45\nset roll_expo = 20\nset uid = PRIVATE_UID\nset craft_name = PRIVATE_NAME\nset gyro_lpf1_type = IGNORE_THIS\nset dshot_bidir = ON\nset p_yaw = SECRET_VALUE\nresource MOTOR 1 A01');
   const { assistant, ai, state } = harness([old, current], old.id);
-  Object.assign(state.aircraft[0], { registrationId: 'PRIVATE_REGISTRATION', serialNumber: 'PRIVATE_SERIAL' });
+  Object.assign(state.aircraft[0], { registrationId: 'PRIVATE_REGISTRATION', serialNumber: 'PRIVATE_SERIAL', flightRecordSerials: ['PRIVATE_ALIAS'] });
   const report = await assistant.reviewSnapshot(current.id);
   const transmitted = JSON.stringify(ai.run.mock.calls[0][1]);
-  for (const secret of ['PRIVATE_UID', 'PRIVATE_NAME', 'private-file', 'Private label', 'private notes', 'SECRET_VALUE', 'IGNORE_THIS', 'resource MOTOR', 'baselineSnapshotId', 'PRIVATE_REGISTRATION', 'PRIVATE_SERIAL']) expect(transmitted).not.toContain(secret);
+  for (const secret of ['PRIVATE_UID', 'PRIVATE_NAME', 'private-file', 'Private label', 'private notes', 'SECRET_VALUE', 'IGNORE_THIS', 'resource MOTOR', 'baselineSnapshotId', 'PRIVATE_REGISTRATION', 'PRIVATE_SERIAL', 'PRIVATE_ALIAS']) expect(transmitted).not.toContain(secret);
   expect(report.context.snapshotId).toBe(current.id);
   expect(report.context.baselineSnapshotId).toBe(old.id);
   expect(report.context.comparison.counts.changed).toBe(2);

@@ -1,0 +1,70 @@
+import { decodedDjiFixture } from '../helpers/dji-fixtures.mjs';
+
+/** Mixed-controller import with synthetic records and the injected memory store. */
+export async function runFleetJourney({ page, expect, baseURL }) {
+  const errors = [];
+  const onError = error => errors.push(error.message);
+  page.on('pageerror', onError);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const readState = async () => (await page.request.get(baseURL + '/api/state')).json();
+  for (const [name, serial] of [['Fleet quad A', 'FLEET-A'], ['Fleet quad B', 'FLEET-B']]) {
+    await page.getByRole('button', { name: '+ Add aircraft', exact: true }).click();
+    const form = page.getByRole('dialog', { name: 'Add an aircraft' });
+    await form.getByLabel('Aircraft name').fill(name);
+    await form.getByLabel('Serial number').fill(serial);
+    await form.getByRole('button', { name: 'Add aircraft', exact: true }).click();
+    await expect(form).not.toBeVisible();
+  }
+  const before = await readState();
+  const records = ['FLEET-A', 'FLEET-B', 'FUTURE-O4', 'FUTURE-O4'].map((serial, index) => Buffer.from(JSON.stringify(decodedDjiFixture({ details: { ...decodedDjiFixture().details, aircraftSn: serial, rcSn: 'SHARED-CONTROLLER', startTime: `2026-10-14T${14 + index}:00:00Z` } }))));
+  await page.getByRole('button', { name: '↑ Import DJI flights', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import DJI flights' });
+  await expect(dialog.getByLabel('Aircraft assignment')).toHaveValue('');
+  await dialog.getByLabel('Source device (optional)').fill('Same remote');
+  await dialog.getByLabel('Choose one or more flight records · maximum 25 MiB each').setInputFiles(records.map((buffer, index) => ({ name: `fleet-${index}.json`, mimeType: 'application/json', buffer })));
+  await dialog.getByRole('button', { name: 'Import selected flights', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Import selected flights', exact: true })).toBeEnabled();
+  await expect(dialog.getByText('UNASSIGNED', { exact: true })).toHaveCount(2);
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  const imported = await readState();
+  const a = imported.aircraft.find(item => item.name === 'Fleet quad A');
+  const b = imported.aircraft.find(item => item.name === 'Fleet quad B');
+  expect(imported.flightLogs.find(log => log.filename === 'fleet-0.json').aircraftId).toBe(a.id);
+  expect(imported.flightLogs.find(log => log.filename === 'fleet-1.json').aircraftId).toBe(b.id);
+  const unassigned = imported.flightLogs.find(log => log.filename === 'fleet-2.json');
+  expect(unassigned.aircraftId).toBeNull();
+  expect(imported.sessions).toHaveLength(before.sessions.length + 2);
+  await page.getByLabel('Filter aircraft assignment').selectOption('unassigned');
+  await page.getByRole('button', { name: 'fleet-2.json', exact: true }).click();
+  await expect(page.getByText('FUTURE-O4', { exact: true })).toBeVisible();
+  await page.getByLabel('Assign flight to aircraft').selectOption(b.id);
+  await expect(page.getByLabel('Remember this record’s aircraft serial for future imports')).toBeChecked();
+  await page.getByRole('button', { name: 'Save aircraft assignment', exact: true }).click();
+  await expect(page.getByText('Aircraft assignment saved.', { exact: true })).toBeVisible();
+  const assigned = await readState();
+  expect(assigned.sessions).toHaveLength(before.sessions.length + 3);
+  expect(assigned.aircraft.find(item => item.id === b.id).flightRecordSerials).toContain('FUTURE-O4');
+  expect(assigned.flightLogs.find(log => log.id === unassigned.id).aircraftId).toBe(b.id);
+  await page.getByRole('button', { name: '← All DJI imports', exact: true }).click();
+  await page.getByRole('button', { name: 'Match unassigned flights', exact: true }).click();
+  await expect(page.getByText('1 assigned · 0 still unassigned.', { exact: true })).toBeVisible();
+  expect((await readState()).sessions).toHaveLength(before.sessions.length + 4);
+  await page.reload();
+  await page.getByRole('button', { name: /DJI flight imports/ }).click();
+  await expect(page.getByLabel('Filter aircraft assignment')).toHaveValue('all');
+  const later = Buffer.from(JSON.stringify(decodedDjiFixture({ details: { ...decodedDjiFixture().details, aircraftSn: 'FUTURE-O4', startTime: '2026-10-14T18:00:00Z' } })));
+  await page.getByRole('button', { name: '↑ Import DJI flights', exact: true }).click();
+  await dialog.getByLabel('Choose one or more flight records · maximum 25 MiB each').setInputFiles([{ name: 'fleet-later.json', mimeType: 'application/json', buffer: later }, { name: 'fleet-renamed.json', mimeType: 'application/json', buffer: records[2] }]);
+  await dialog.getByRole('button', { name: 'Import selected flights', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Import selected flights', exact: true })).toBeEnabled();
+  await expect(dialog.getByText('ALREADY IMPORTED', { exact: true })).toHaveCount(1);
+  const final = await readState();
+  expect(final.flightLogs.find(log => log.filename === 'fleet-later.json').aircraftId).toBe(b.id);
+  expect(final.sessions).toHaveLength(before.sessions.length + 5);
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  expect(errors).toEqual([]);
+  page.off('pageerror', onError);
+  return { passed: ['automatic default', 'mixed aircraft from one controller', 'unknown aircraft inbox', 'assignment creates session', 'remembered serial alias', 'explicit inbox batch matching', 'reload inventory', 'later auto-routing', 'dedupe after assignment', 'mobile inventory'], errors };
+}

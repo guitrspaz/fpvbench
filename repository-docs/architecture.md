@@ -36,7 +36,7 @@ An aircraft's baseline and a session's setup snapshot must belong to that aircra
 
 The data directory has one live owner. Writes are serialized, and new state is published after repository persistence succeeds. The original DJI bytes are stored under `imports/<sha256>.bin`. Original filenames are metadata rather than filesystem paths. Downloads check the original fingerprint.
 
-First open validates legacy v1 JSON, creates an unchanged timestamped backup, and migrates IDs, relationships, and notes transactionally. SQLite becomes authoritative; legacy JSON is retained. Corrupt data fails without replacement. Complete v2 exports include catalog, original files, and telemetry. Restore runs locally while the server is stopped and preserves the prior workspace. See [storage and backups](storage-and-backups.md).
+First open validates legacy v1 JSON, creates an unchanged timestamped backup, and migrates IDs, relationships, and notes transactionally. SQLite becomes authoritative; legacy JSON is retained. Corrupt data fails without replacement. Complete v3 exports include catalog, original files, and telemetry. Restore runs locally while the server is stopped and preserves the prior workspace. See [storage and backups](storage-and-backups.md).
 
 ## Evidence
 
@@ -65,3 +65,7 @@ Jest and browser checks inject a synthetic memory repository through store/serve
 A separately invoked operational proof uses actual SQLite in a disposable temporary workspace to check migration, restart, rollback, complete backup/restore, and raw bytes. Actual WASM decoding uses a synthetic flight record. Real device samples remain a separate compatibility check.
 
 Jest, Playwright, and ESLint are development dependencies. The `@istanbuljs/load-nyc-config` override selects `js-yaml` 4.3.2 or later in the 4.x line, avoiding a vulnerable legacy dependency in the test chain.
+
+## Fleet routing and inbox
+
+Imported flight records can have a null aircraft relationship in catalog/SQLite version 3. Aircraft and sessions still require actual fleet identities. Serial matching uses only aircraft serials and explicit aliases; controller identity, labels and selection do not route mixed imports. Unassigned records retain original/telemetry evidence without a session until assignment. Assignment, alias learning and session creation/update commit together. Explicit batch rematching only changes unassigned records. Reassignment clears the old aircraft’s setup link and confirmation while retaining session observations. Exact-byte dedupe spans all aircraft and the inbox. Existing v2 SQLite is backed up before its transactional nullable-flight relationship migration; complete v2 JSON exports remain restorable.

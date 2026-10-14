@@ -27,7 +27,7 @@ export function decodeOriginalBase64(value) {
 export function migrateLegacyCatalog(legacy) {
   validateWorkspace(legacy);
   if (legacy.version !== 1) throw new Error('Expected a version 1 legacy workspace.');
-  return { version: 2, aircraft: copy(legacy.aircraft), snapshots: copy(legacy.snapshots), sessions: legacy.sessions.map(session => ({ ...copy(session), flightLogId: null })), flightLogs: [] };
+  return { version: 3, aircraft: copy(legacy.aircraft), snapshots: copy(legacy.snapshots), sessions: legacy.sessions.map(session => ({ ...copy(session), flightLogId: null })), flightLogs: [] };
 }
 
 export async function safeOriginal(dataDir, log) {
@@ -65,12 +65,13 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
         state = migrateLegacyCatalog(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(legacyRaw)));
         const backup = join(dataDir, `workspace-v1-${Date.now()}-${randomUUID()}.json.bak`);
         await writeFile(backup, legacyRaw, { flag: 'wx', mode: 0o600 });
-      } else state = { version: 2, aircraft: [], snapshots: [], sessions: [], flightLogs: [] };
+      } else state = { version: 3, aircraft: [], snapshots: [], sessions: [], flightLogs: [] };
       validateWorkspace(state);
       await repository.save(state, null);
     } else {
       validateWorkspace(state);
-      if (state.version !== 2) throw new Error('Repository must contain a version 2 catalog.');
+      if (![2, 3].includes(state.version)) throw new Error('Repository must contain a version 2 or 3 catalog.');
+      if (state.version === 2) { const previous = copy(state); state.version = 3; await repository.save(state, previous); }
     }
     for (const log of state.flightLogs) await safeOriginal(dataDir, log);
     const telemetry = await repository.exportTelemetry();
@@ -95,6 +96,21 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
     return work;
   };
   const sessionRecord = input => ({ id: randomUUID(), aircraftId: input.aircraftId, snapshotId: null, flightLogId: null, title: input.title, flownAt: input.flownAt, location: '', durationMinutes: null, battery: '', props: '', conditions: '', notes: '', outcome: 'unrated', mediaRefs: [], confirmedSetup: false, ...input, createdAt: timestamp() });
+  const matchAircraft = (catalog, serial) => {
+    if (!serial) return [];
+    const key = serial.trim().toLowerCase();
+    return catalog.aircraft.filter(aircraft => [aircraft.serialNumber, ...(aircraft.flightRecordSerials ?? [])].some(value => typeof value === 'string' && value.trim() && value.trim().toLowerCase() === key));
+  };
+  const attachSession = (catalog, log) => {
+    const existing = catalog.sessions.find(session => session.flightLogId === log.id);
+    if (existing) {
+      if (existing.aircraftId !== log.aircraftId) Object.assign(existing, { aircraftId: log.aircraftId, snapshotId: null, confirmedSetup: false });
+      validateSession(catalog, existing); return existing;
+    }
+    if (log.aircraftId === null || log.summary.startTime === null) return null;
+    const session = sessionRecord({ aircraftId: log.aircraftId, flightLogId: log.id, title: `DJI flight ${log.summary.startTime.slice(0, 10)}`, flownAt: log.summary.startTime, durationMinutes: log.summary.durationSeconds === null ? null : log.summary.durationSeconds / 60, location: log.summary.location ?? '' });
+    validateSession(catalog, session); catalog.sessions.push(session); return session;
+  };
   const store = {
     close() {
       if (!closePromise) { closed = true; closePromise = queue.then(async () => { try { await repository.close(); } finally { await releaseLock(); } }); }
@@ -124,7 +140,7 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
     },
     createAircraft: input => mutate(next => {
       objectInput(input, aircraftFields.filter(field => field !== 'baselineSnapshotId'));
-      const record = { id: randomUUID(), name: input.name, kind: input.kind ?? '', registrationId: input.registrationId === undefined ? '' : input.registrationId, serialNumber: input.serialNumber === undefined ? '' : input.serialNumber, notes: input.notes ?? '', baselineSnapshotId: null, createdAt: timestamp() };
+      const record = { id: randomUUID(), name: input.name, kind: input.kind ?? '', registrationId: input.registrationId === undefined ? '' : input.registrationId, serialNumber: input.serialNumber === undefined ? '' : input.serialNumber, flightRecordSerials: input.flightRecordSerials === undefined ? [] : input.flightRecordSerials, notes: input.notes ?? '', baselineSnapshotId: null, createdAt: timestamp() };
       next.aircraft.push(record); validateAircraft(next, record); return { value: record };
     }),
     updateAircraft: (id, input) => mutate(next => {
@@ -148,41 +164,65 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
       objectInput(input, sessionFields); const record = getRecord(next, 'sessions', id);
       Object.assign(record, input); validateSession(next, record); return { value: record };
     }),
+    matchUnassignedFlightLogs: () => mutate(next => {
+      let matched = 0;
+      for (const log of next.flightLogs.filter(log => log.aircraftId === null)) {
+        const matches = matchAircraft(next, log.summary.aircraftSerial);
+        if (matches.length !== 1) continue;
+        log.aircraftId = matches[0].id; attachSession(next, log); validateFlightLog(next, log); matched++;
+      }
+      return { value: { matched, unassigned: next.flightLogs.filter(log => log.aircraftId === null).length } };
+    }),
     updateFlightLog: (id, input) => mutate(next => {
-      objectInput(input, ['airdataStatus']);
+      objectInput(input, ['airdataStatus', 'aircraftId', 'rememberAircraft']);
       const record = getRecord(next, 'flightLogs', id);
-      Object.assign(record, input); validateFlightLog(next, record); return { value: record };
+      if (input.rememberAircraft !== undefined && typeof input.rememberAircraft !== 'boolean') throw new AppError('rememberAircraft must be a boolean.');
+      if (input.rememberAircraft && !Object.hasOwn(input, 'aircraftId')) throw new AppError('Choose an aircraft before remembering its serial.');
+      if (Object.hasOwn(input, 'airdataStatus')) record.airdataStatus = input.airdataStatus;
+      if (Object.hasOwn(input, 'aircraftId')) {
+        const aircraft = getRecord(next, 'aircraft', input.aircraftId);
+        if (input.rememberAircraft) {
+          const serial = record.summary.aircraftSerial;
+          if (!serial) throw new AppError('This record has no aircraft serial to remember.');
+          if (matchAircraft(next, serial).some(item => item.id !== aircraft.id)) throw new AppError('This aircraft serial already matches a different aircraft. Assign without remembering, or correct the fleet serial first.', 409);
+          if (!matchAircraft(next, serial).some(item => item.id === aircraft.id)) aircraft.flightRecordSerials = [...(aircraft.flightRecordSerials ?? []), serial];
+          validateAircraft(next, aircraft);
+        }
+        record.aircraftId = aircraft.id;
+        attachSession(next, record);
+      }
+      validateFlightLog(next, record); return { value: record };
     }),
     importFlightLog: input => mutate(async next => {
       objectInput(input, ['aircraftId', 'filename', 'sourceDevice', 'contentBase64']);
-      getRecord(next, 'aircraft', input.aircraftId);
+      const manualAircraftId = input.aircraftId ?? null;
+      if (manualAircraftId !== null) getRecord(next, 'aircraft', manualAircraftId);
       textField(input.filename, 'filename', { required: true, max: 255 });
       const sourceDevice = textField(input.sourceDevice ?? '', 'sourceDevice', { max: 200 });
       const bytes = decodeOriginalBase64(input.contentBase64), sha256 = hash(bytes);
       const existing = next.flightLogs.find(log => log.sha256 === sha256);
       if (existing) {
-        if (existing.aircraftId !== input.aircraftId) throw new AppError('These original flight bytes are already attached to another aircraft. Select that aircraft to view the existing import.', 409);
-        return { value: { flightLog: existing, session: next.sessions.find(session => session.flightLogId === existing.id) ?? null, duplicate: true } };
+        if (manualAircraftId !== null && existing.aircraftId !== manualAircraftId) throw new AppError('These original flight bytes are already attached to another aircraft. Select that aircraft to view the existing import.', 409);
+        return { value: { flightLog: existing, session: next.sessions.find(session => session.flightLogId === existing.id) ?? null, duplicate: true, routing: 'existing' } };
       }
       const decoder = decodeFlight ?? (await import('./dji-import.mjs')).decodeDjiFlight;
       const decoded = await decoder(bytes, { filename: input.filename });
       validateFrames(decoded.frames);
-      const log = { id: randomUUID(), aircraftId: input.aircraftId, filename: input.filename, sourceDevice, importedAt: timestamp(), sha256, byteLength: bytes.length, format: decoded.format, logVersion: decoded.logVersion, status: decoded.status, summary: copy(decoded.summary), frameCount: decoded.frames.length, warnings: copy(decoded.warnings), airdataStatus: 'unknown' };
+      const matches = matchAircraft(next, decoded.summary.aircraftSerial);
+      const matchedAircraftId = manualAircraftId ?? (matches.length === 1 ? matches[0].id : null);
+      const routing = manualAircraftId !== null ? 'manual' : matchedAircraftId !== null ? 'serial-match' : 'unassigned';
+      const log = { id: randomUUID(), aircraftId: matchedAircraftId, filename: input.filename, sourceDevice, importedAt: timestamp(), sha256, byteLength: bytes.length, format: decoded.format, logVersion: decoded.logVersion, status: decoded.status, summary: copy(decoded.summary), frameCount: decoded.frames.length, warnings: copy(decoded.warnings), airdataStatus: 'unknown' };
       if (log.summary.startTime === null) log.warnings.push('Start time is unavailable. The original was retained; create a session manually using a verified flight time.');
       validateFlightLog(next, log);
       next.flightLogs.push(log);
-      let session = null;
-      if (log.summary.startTime !== null) {
-        session = sessionRecord({ aircraftId: log.aircraftId, flightLogId: log.id, title: `DJI flight ${log.summary.startTime.slice(0, 10)}`, flownAt: log.summary.startTime, durationMinutes: log.summary.durationSeconds === null ? null : log.summary.durationSeconds / 60, location: log.summary.location ?? '' });
-        validateSession(next, session); next.sessions.push(session);
-      }
+      const session = attachSession(next, log);
       const imports = join(dataDir, 'imports'); await mkdir(imports, { recursive: true, mode: 0o700 });
       const info = await lstat(imports); if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Unsafe original imports directory.');
       const originalPath = join(imports, `${sha256}.bin`);
       let created = false;
       try { await writeFile(originalPath, bytes, { flag: 'wx', mode: 0o600 }); created = true; }
       catch (error) { if (error.code !== 'EEXIST') throw error; await safeOriginal(dataDir, log); }
-      return { value: { flightLog: log, session, duplicate: false }, persistence: { telemetry: { flightLogId: log.id, frames: decoded.frames } }, rollback: async () => { if (created) await unlink(originalPath); } };
+      return { value: { flightLog: log, session, duplicate: false, routing }, persistence: { telemetry: { flightLogId: log.id, frames: decoded.frames } }, rollback: async () => { if (created) await unlink(originalPath); } };
     }),
   };
   store.getFlightLogRaw = store.getFlightOriginal;

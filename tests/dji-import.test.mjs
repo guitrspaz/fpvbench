@@ -12,12 +12,15 @@ const fakeWorker = () => {
 };
 
 describe('DJI import normalization', () => {
-  test('converts sourced units, timestamps and frame fields while omitting component serials', () => {
+  test('converts sourced units and retains only aircraft identity, excluding shared controller serials', () => {
     const fixture = decodedDjiFixture();
-    fixture.details.aircraftSn = 'PRIVATE';
+    fixture.details.aircraftSn = 'SYNTHETIC-AIRCRAFT';
+    fixture.details.rcSn = 'PRIVATE-REMOTE';
+    fixture.details.cameraSn = 'PRIVATE-CAMERA';
     const result = normalizeDecodedFlight(fixture);
     expect(result).toMatchObject({ format: 'dji-json', logVersion: 13, status: 'decoded', summary: { startTime: '2026-10-14T12:00:00.000Z', durationSeconds: 120, distanceMeters: 250, maxHeightMeters: 30, maxHorizontalSpeedMps: 5, aircraftModel: 'Avata2', location: 'Synthetic test site' } });
     expect(result.frames[0]).toEqual({ timestamp: '2026-10-14T12:00:00.000Z', elapsedSeconds: 0, latitude: 10, longitude: 20, altitudeMeters: 5, batteryPercent: 90, horizontalSpeedMps: 5 });
+    expect(result.summary.aircraftSerial).toBe('SYNTHETIC-AIRCRAFT');
     expect(JSON.stringify(result)).not.toContain('PRIVATE');
   });
   test('derives upstream CLI start time from telemetry without inventing omitted metadata', () => {

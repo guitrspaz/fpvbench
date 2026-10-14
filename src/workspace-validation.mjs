@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { AppError, assertSafeObject, containsControlText } from "./errors.mjs";
 import { parseExport } from "./parser.mjs";
 
-export const aircraftFields = ["name", "kind", "registrationId", "serialNumber", "notes", "baselineSnapshotId"];
+export const aircraftFields = ["name", "kind", "registrationId", "serialNumber", "flightRecordSerials", "notes", "baselineSnapshotId"];
 export const sessionFields = [
   "aircraftId",
   "snapshotId",
@@ -92,6 +92,11 @@ export function validateAircraft(state, record) {
   // Older catalogs and backups may omit these optional aircraft identifiers.
   for (const field of ["registrationId", "serialNumber"])
     if (Object.hasOwn(record, field)) textField(record[field], field, { max: 200 });
+  if (record.flightRecordSerials !== undefined) {
+    if (!Array.isArray(record.flightRecordSerials) || record.flightRecordSerials.length > 100) throw new AppError("flightRecordSerials must contain at most 100 aircraft serials.");
+    for (const serial of record.flightRecordSerials) textField(serial, "flight record serial", { required: true, max: 200 });
+    if (new Set(record.flightRecordSerials.map(serial => serial.trim().toLowerCase())).size !== record.flightRecordSerials.length) throw new AppError("Duplicate flight record serial.");
+  }
   textField(record.notes, "notes");
   snapshotRelationship(state, record.id, record.baselineSnapshotId);
 }
@@ -134,7 +139,7 @@ export function validateWorkspace(state) {
   const legacy = state.version === 1;
   objectInput(state, legacy ? ["version", "aircraft", "snapshots", "sessions"] : ["version", "aircraft", "snapshots", "sessions", "flightLogs"]);
   if (
-    ![1, 2].includes(state.version) ||
+    ![1, 2, 3].includes(state.version) ||
     !["aircraft", "snapshots", "sessions"].every((key) =>
       Array.isArray(state[key]),
     )
@@ -204,10 +209,11 @@ function bounded(value, field, min, max) {
 
 /** Validate decoder summary evidence without inventing missing values. */
 export function validateSummary(summary) {
-  objectInput(summary, ['startTime', ...Object.keys(summaryNumbers), 'aircraftName', 'aircraftModel', 'location', 'startCoordinate']);
+  objectInput(summary, ['startTime', ...Object.keys(summaryNumbers), 'aircraftName', 'aircraftModel', 'aircraftSerial', 'location', 'startCoordinate']);
   if (summary.startTime !== null) isoDate(summary.startTime, 'startTime');
   for (const [field, bounds] of Object.entries(summaryNumbers)) bounded(summary[field], field, ...bounds);
   for (const field of ['aircraftName', 'aircraftModel', 'location']) if (summary[field] !== null) textField(summary[field], field, { max: 1000 });
+  if (summary.aircraftSerial !== undefined && summary.aircraftSerial !== null) textField(summary.aircraftSerial, 'aircraftSerial', { required: true, max: 200 });
   if (summary.startCoordinate !== null) {
     objectInput(summary.startCoordinate, ['latitude', 'longitude']);
     if (summary.startCoordinate.latitude === null || summary.startCoordinate.longitude === null) throw new AppError('A start coordinate requires both latitude and longitude.');
@@ -231,7 +237,8 @@ export function validateFlightLog(state, record) {
   objectInput(record, ['id', 'aircraftId', 'filename', 'sourceDevice', 'importedAt', 'sha256', 'byteLength', 'format', 'logVersion', 'status', 'summary', 'frameCount', 'warnings', 'airdataStatus']);
   if (!Object.hasOwn(record, 'airdataStatus')) record.airdataStatus = 'unknown';
   if (!['unknown', 'not-uploaded', 'uploaded'].includes(record.airdataStatus)) throw new AppError('Choose a valid manual AirData status.');
-  getRecord(state, 'aircraft', record.aircraftId);
+  if (record.aircraftId !== null) getRecord(state, 'aircraft', record.aircraftId);
+  else if (state.version !== 3) throw new AppError('Unassigned flights require a version 3 catalog.');
   textField(record.filename, 'filename', { required: true, max: 255 });
   textField(record.sourceDevice, 'sourceDevice', { max: 200 });
   if (!/^[a-f0-9]{64}$/.test(record.sha256)) throw new AppError('Invalid flight checksum.');

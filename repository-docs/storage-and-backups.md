@@ -14,12 +14,19 @@ At the first v0.2 start, existing `workspace.json` is validated, copied to a tim
 
 The old JSON file remains in place. Subsequent opens use SQLite, so editing the legacy JSON no longer changes the active workspace. Unsupported or corrupt data is rejected without reset. Preserve existing files before investigating a startup failure.
 
+## Upgrade to the fleet-aware catalog
+
+v0.4 uses SQLite/catalog version 3 so flight records can wait in an inbox without an aircraft. On first opening an existing version 2 database, the app validates its schema, catalog, relationships and telemetry, saves an exact owner-private SQLite backup named workspace-before-v3, then upgrades the flight-log relationship transactionally. IDs, notes, setups, upload status, original files and optional AI settings stay intact. Later opens do not repeat the migration or backup. Invalid data is rejected without resetting it.
+
+The exact SQLite backup preserves the pre-upgrade database. Retain the matching imports directory with it. For ordinary restoration, use the complete JSON export and restore command below; older version 2 exports are validated and converted into the current catalog.
+
 ## Complete export
 
-Use **Export workspace** in the interface. Version 2 JSON contains:
+Use **Export workspace** in the interface. Version 3 JSON contains:
 
 - Aircraft, full Betaflight snapshots, and editable flight sessions.
-- Imported flight summaries and metadata.
+- Imported flight summaries and metadata, including unassigned inbox entries and aircraft serial evidence.
+- Aircraft serial aliases explicitly remembered for future routing.
 - Exact original DJI files encoded as base64.
 - All stored normalized telemetry frames.
 
@@ -27,7 +34,7 @@ This is a complete portable backup rather than just a list of summaries. Keep it
 
 ## Restore
 
-Stop FPVBench, then run from the repository directory with a complete version 2 export:
+Stop FPVBench, then run from the repository directory with a complete version 2 or 3 export:
 
 ```sh
 node src/restore.mjs /absolute/path/fpvbench-workspace.json

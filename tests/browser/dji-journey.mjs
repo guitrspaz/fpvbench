@@ -31,6 +31,7 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   const importFiles = async files => {
     await page.locator('.heading-actions').getByRole('button', { name: '↑ Import DJI flights', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Import DJI flights' });
+    await dialog.getByLabel('Aircraft assignment').selectOption({ label: 'Synthetic smoke quad' });
     await dialog.getByLabel('Source device (optional)').fill('Synthetic DJI RC');
     await dialog.getByLabel('Choose one or more flight records · maximum 25 MiB each').setInputFiles(files);
     await dialog.getByRole('button', { name: 'Import selected flights', exact: true }).click();

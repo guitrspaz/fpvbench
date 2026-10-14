@@ -9,7 +9,7 @@ import { createMemoryRepository } from './helpers/memory-repository.mjs';
 
 test('missing complete-backup members, invalid schema and null are rejected without a database', () => {
   const empty = { version: 2, aircraft: [], snapshots: [], sessions: [], flightLogs: [], originals: [], telemetry: [] };
-  expect(validateCompleteBackup(empty).catalog.version).toBe(2);
+  expect(validateCompleteBackup(empty).catalog.version).toBe(3);
   expect(() => validateCompleteBackup({ ...empty, originals: undefined })).toThrow();
   expect(() => validateCompleteBackup({ ...empty, telemetry: [{}] })).toThrow();
   expect(() => validateWorkspace(null)).toThrow(/workspace/i);

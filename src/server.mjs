@@ -228,6 +228,10 @@ export async function createServer({
       }
       if (req.method === "POST" && path === "/api/sessions")
         return json(res, 201, await store.createSession(await body(req)));
+      if (req.method === "POST" && path === "/api/flight-logs/match-unassigned") {
+        emptyAiBody(await body(req, 1024));
+        return json(res, 200, await store.matchUnassignedFlightLogs());
+      }
       if (req.method === "POST" && path === "/api/flight-logs") {
         const result = await store.importFlightLog(await body(req, FLIGHT_BODY_LIMIT));
         return json(res, result.duplicate ? 200 : 201, result);

@@ -35,6 +35,21 @@ test('aircraft identifiers are editable through the API and retained in state an
   }
 });
 
+test('bulk import can retain an unassigned flight before any aircraft exists and assign it later', async () => {
+  const imported = await request('/api/flight-logs', 'POST', { filename: 'empty-fleet.json', contentBase64: Buffer.from('synthetic unassigned').toString('base64') });
+  expect(imported.status).toBe(201);
+  const result = await imported.json();
+  expect(result.flightLog.aircraftId).toBeNull();
+  expect(result.session).toBeNull();
+  const aircraft = await (await request('/api/aircraft', 'POST', { name: 'Later aircraft' })).json();
+  expect((await request(`/api/flight-logs/${result.flightLog.id}`, 'PATCH', { aircraftId: aircraft.id })).status).toBe(200);
+  const state = await (await request('/api/state')).json();
+  expect(state.sessions[0]).toMatchObject({ aircraftId: aircraft.id, flightLogId: result.flightLog.id });
+  const rematched = await request('/api/flight-logs/match-unassigned', 'POST', {});
+  expect(rematched.status).toBe(200);
+  expect(await rematched.json()).toEqual({ matched: 0, unassigned: 0 });
+});
+
 test('aircraft/import/baseline/session/edit/compare/download journey', async () => {
   const made = await request('/api/aircraft', 'POST', { name: 'Quad' });
   expect(made.status).toBe(201);
@@ -49,7 +64,7 @@ test('aircraft/import/baseline/session/edit/compare/download journey', async () 
   expect(await raw.text()).toBe(rawText);
   expect(raw.headers.get('content-disposition')).toMatch(/attachment/);
   expect((await (await request(`/api/compare?from=${snapshot.id}&to=${snapshot.id}`)).json()).counts.unchanged).toBe(1);
-  expect((await (await request('/api/export')).json()).version).toBe(2);
+  expect((await (await request('/api/export')).json()).version).toBe(3);
   expect((await (await request('/api/state')).json()).sessions[0].outcome).toBe('better');
 });
 test('validates content types, body, absent records, host, origin and traversal', async () => {
@@ -126,7 +141,7 @@ test('DJI import, dedupe, frames, exact original, session edit and complete expo
   expect(state.flightLogs).toHaveLength(1);
   expect(state.flightLogs[0]).not.toHaveProperty('frames');
   const exported = await (await request('/api/export')).json();
-  expect(exported.version).toBe(2);
+  expect(exported.version).toBe(3);
   expect(exported.flightLogs).toHaveLength(1);
   expect(exported.originals).toEqual([{ flightLogId: id, contentBase64: original.toString('base64') }]);
   expect(exported.telemetry).toEqual([{ flightLogId: id, frames: [frame, { ...frame, elapsedSeconds: 1 }] }]);

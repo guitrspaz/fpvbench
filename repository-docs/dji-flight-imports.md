@@ -2,7 +2,7 @@
 
 ## Copied files
 
-FPVBench reads files you select from your computer. It does not connect to a controller, goggles, or DJI account. Copy the flight records from your device first, create/select the aircraft, then use **Import DJI flights**. Files are handled individually so one unsupported file does not discard successful imports.
+FPVBench reads files you select from your computer. It does not connect to a controller, goggles, or DJI account. Copy the flight records from your device first, use **Import DJI flights**. Files are handled individually so one unsupported file does not discard successful imports.
 
 Supported inputs:
 
@@ -13,13 +13,23 @@ TXT is a binary flight record, despite its extension; it is not pasted text. DAT
 
 The implementation pins decoder version 0.5.7. RC, RC2, and Goggles N3 are source labels, not a blanket guarantee that every firmware/export variant is supported. Compatibility with real user files must be checked with representative local samples.
 
+## Bulk import and aircraft assignment
+
+Automatic matching is the default, including before any aircraft has been added. Each file is matched against a unique aircraft serial from fleet records and saved flight-record serial aliases. The selected aircraft, aircraft name/model, shared controller/goggles, and source-device label never supply an automatic assignment. Missing or ambiguous serials stay unassigned.
+
+Use **Unassigned** in the library to review these files. Their original bytes, summaries, telemetry and AirData status are saved; a linked session waits until an aircraft is assigned and a valid flight time exists. Add an aircraft if needed, open the record, choose its aircraft and save. **Remember this record’s aircraft serial for future imports** stores a separate serial alias, useful when a custom aircraft’s physical serial differs from its O4 identity. It does not replace the hardware serial you entered. Saved aliases appear under **Edit aircraft → Additional flight-record serials**; remove a mistaken alias there before learning it for a different aircraft. Conflicting remembered serials are rejected; explicit assignment without remembering remains possible.
+
+Choose **Match unassigned flights** after adding aircraft or learning serial aliases to route other inbox files with unique matches. Assigned records are never moved by this action. You can also choose a specific aircraft in the import dialog, which applies that manual assignment to every selected file.
+
+The library filters all aircraft, the selected aircraft, or unassigned records. Later reassignment retains observations, original bytes and AirData status, but clears the previous aircraft’s setup selection and confirmation.
+
 ## Summaries and telemetry
 
 DJI record versions 13 and newer encrypt detailed telemetry. Their available summary can be read locally; FPVBench marks these imports **summary only**. The maintained parser documents the required DJI keychains for detailed decoding. FPVBench does not request them or ask for API credentials in this version.
 
 Older binary records and supported decoded JSON can provide telemetry. A local frame-decoding failure retains a valid summary with a warning. Missing values stay unavailable rather than becoming guessed measurements.
 
-The summary may supply flight time, duration, distance, maximum height/speed, aircraft name/model, and location. A valid timestamp creates a flight session automatically. If it is missing, the imported record is retained with a warning. Battery, props, weather, notes, results, and setup confirmation remain yours to enter. DJI telemetry does not establish a Betaflight setup.
+The summary may supply flight time, duration, distance, maximum height/speed, aircraft serial, name/model, and location. For an assigned aircraft, a valid timestamp creates a flight session automatically. If it is missing, the imported record is retained with a warning. Battery, props, weather, notes, results, and setup confirmation remain yours to enter. DJI telemetry does not establish a Betaflight setup.
 
 Decoded frames appear in a paginated table with available time, position, altitude, battery percentage, and horizontal speed. No remote map tiles are fetched.
 
@@ -27,7 +37,7 @@ Decoded frames appear in a paginated table with available time, position, altitu
 
 Imported measurements and original bytes are immutable. The separate AirData status is editable. Editing a session changes your observations, not the imported measurements. Each session retains its imported-flight link.
 
-SHA-256 identifies the original bytes. Importing the same bytes for the same aircraft returns the existing record, even under another filename. Assigning identical bytes to a different aircraft is rejected to avoid silently conflicting histories.
+SHA-256 identifies the original bytes. Automatic reimporting of identical bytes returns the existing record across the fleet or inbox, even under another filename. It never changes an existing assignment or upload status. An explicit import request for a different aircraft is rejected; use the record’s assignment controls to make a deliberate correction.
 
 **Download original** returns the exact imported bytes after checking their fingerprint. The complete workspace export includes original files and telemetry as well as the ordinary setup/session data.
 
@@ -41,6 +51,6 @@ FPVBench does not submit files to AirData or read its account history. A local i
 
 Decoding runs in a bounded worker with a 10-second timeout. Imported filenames are metadata, never storage paths. Original bytes are kept in the owner-private workspace outside the source repository. No file is uploaded to a remote decoder or DJI API.
 
-Flight files and complete backups may contain coordinates and component identifiers even though full serials are not shown in the summary. Use synthetic examples for code contributions and public demonstrations.
+Flight files and complete backups may contain coordinates and component identifiers and retained aircraft serials. Controller, camera and battery serials are excluded from the normalized summary; the exact original file may still contain them. Use synthetic examples for code contributions and public demonstrations.
 
 Primary references: [maintained decoder](https://github.com/lvauvillier/dji-log-parser) and [DJI FlightRecordParsingLib](https://github.com/dji-sdk/FlightRecordParsingLib).

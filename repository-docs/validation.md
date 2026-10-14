@@ -25,7 +25,15 @@ node dev/verify-ai.mjs
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.3 results — 2026-10-14
+## Observed v0.4 results — 2026-10-14
+
+- 109 Jest tests passed across ten suites, including mixed-aircraft serial routing, empty-fleet imports, ambiguity, aliases, assignment/reassignment, batch rematching, dedupe and complete backups. ESLint passed.
+- 56 browser checks passed using synthetic records, memory repositories and a fake AI provider, including mixed bulk import from one source, unassigned review, learned aliases, batch matching and mobile inventory.
+- Disposable SQLite operational verification passed exact v2 backup, preservation of existing records, v3 migration, inbox assignment, idempotent restart and v2/v3 restoration. A malformed pre-upgrade catalog was rejected without changing its bytes.
+- One representative existing version 14 TXT was inspected locally and contained an aircraft serial in the readable summary. No source filenames, personal identifiers or content were added to Git. This confirms that file’s identity availability, not every O4/controller/firmware combination.
+- No actual paid AI requests or external flight uploads were used to validate this feature.
+
+## Historical v0.3 results — 2026-10-14
 
 - **94 Jest tests passed** across nine suites; application, test, and operational-proof ESLint passed.
 - **41 browser checks passed**, covering the previous workflows plus optional AI settings, key privacy, explicit connection checking, setup/goal explanations, cached reads, aggregate recap, automatic reviews, quota shutdown, recovery, zero allowance, and mobile layout. Screenshots were inspected. See [browser validation](browser-validation.md).

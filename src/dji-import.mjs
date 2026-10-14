@@ -11,6 +11,7 @@ const object = value => value !== null && typeof value === 'object' && !Array.is
 const number = (value, min, max) => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : null;
 const metric = value => number(value, 0, 1e8);
 const text = value => typeof value === 'string' && value.trim() && value.length <= 500 && !containsControlText(value) ? value.trim() : null;
+const aircraftSerial = value => { const serial = text(value); return serial && serial.length <= 200 && !/^(?:0+|unknown|none|n\/a)$/i.test(serial) ? serial : null; };
 const iso = value => {
   if (typeof value !== 'string') return null;
   const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(value);
@@ -26,7 +27,7 @@ function coordinate(latitude, longitude) {
   return lat !== null && lon !== null && (lat !== 0 || lon !== 0) ? { latitude: lat, longitude: lon } : null;
 }
 
-/** Normalize a supported decoded export without retaining serial numbers or unrelated fields. */
+/** Normalize a supported decoded export retaining only aircraft serial identity, not controller/camera/battery identifiers. */
 export function normalizeDecodedFlight({ version, details, summary, frames }, format = 'dji-json', warnings = []) {
   if (!Number.isInteger(version) || version < 1 || version > 255) throw new AppError('Invalid DJI log version.', 422);
   const metadata = details ?? summary;
@@ -61,8 +62,9 @@ export function normalizeDecodedFlight({ version, details, summary, frames }, fo
     distanceMeters: metric(metadata.distanceMeters ?? metadata.totalDistance),
     maxHeightMeters: number(metadata.maxHeightMeters ?? metadata.maxHeight, -1e4, 1e5),
     maxHorizontalSpeedMps: number(metadata.maxHorizontalSpeedMps ?? metadata.maxHorizontalSpeed, 0, 1000),
+    aircraftSerial: aircraftSerial(metadata.aircraftSerial ?? metadata.aircraftSn),
     aircraftName: text(metadata.aircraftName),
-    aircraftModel: metadata.productType === 'None' && !metadata.aircraftModel ? null : text(metadata.aircraftModel ?? metadata.productType),
+    aircraftModel: metadata.productType === 'None' && !metadata.aircraftModel ? null : text(metadata.aircraftModel ?? metadata.productType) ?? (Number.isInteger(metadata.productType) && metadata.productType > 0 ? `DJI product type ${metadata.productType}` : null),
     location,
     startCoordinate: coordinate(metadata.startCoordinate?.latitude ?? metadata.latitude, metadata.startCoordinate?.longitude ?? metadata.longitude),
   };

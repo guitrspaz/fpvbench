@@ -8,12 +8,12 @@ import { acquireLock } from './workspace-lock.mjs';
 import { validateWorkspace, objectInput } from './workspace-validation.mjs';
 import { decodeOriginalBase64, validateTelemetry, safeOriginal } from './store.mjs';
 
-/** Validate a complete v2 catalog, telemetry and exact original bytes before restoring. */
+/** Validate a complete v2/v3 catalog, telemetry and exact original bytes before restoring. */
 export function validateCompleteBackup(backup) {
   objectInput(backup, ['version', 'aircraft', 'snapshots', 'sessions', 'flightLogs', 'originals', 'telemetry']);
   const { originals, telemetry, ...catalog } = structuredClone(backup);
-  if (catalog.version !== 2) throw new Error('A complete version 2 backup is required.');
-  validateWorkspace(catalog); validateTelemetry(catalog, telemetry);
+  if (![2, 3].includes(catalog.version)) throw new Error('A complete version 2 or 3 backup is required.');
+  validateWorkspace(catalog); catalog.version = 3; validateTelemetry(catalog, telemetry);
   if (!Array.isArray(originals) || originals.length !== catalog.flightLogs.length) throw new Error('The backup is missing original flight bytes.');
   const seen = new Set(), decodedOriginals = [];
   for (const item of originals) {
