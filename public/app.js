@@ -59,7 +59,8 @@ function date(value, withTime = false) {
 
 const statusOf = aircraft => aircraft.status ?? "active";
 const aircraftLabel = aircraft => `${aircraft.name}${statusOf(aircraft) === "retired" ? " (Retired)" : ""}`;
-function visibleAircraft() { return state.aircraft.filter(aircraft => fleetStatus === "all" || statusOf(aircraft) === fleetStatus); }
+function alphabeticalAircraft() { return [...state.aircraft].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })); }
+function visibleAircraft() { return alphabeticalAircraft().filter(aircraft => fleetStatus === "all" || statusOf(aircraft) === fleetStatus); }
 
 function selectedAircraft() {
   return state.aircraft.find((item) => item.id === aircraftId);
@@ -1357,7 +1358,7 @@ async function showFlightDetail(id, revision) {
       element("p", { class: "proof-note", text: "Values are sourced from this flight record. Recorded duration may include time on the ground; it is not verified airborne time. Unavailable fields stay unknown. Telemetry does not describe or confirm Betaflight settings." }));
     const assignment = element("select", { "aria-label": "Assign flight to aircraft" },
       element("option", { value: "", text: "Choose an aircraft" }),
-      ...state.aircraft.map(aircraft => element("option", { value: aircraft.id, text: aircraftLabel(aircraft) })));
+      ...alphabeticalAircraft().map(aircraft => element("option", { value: aircraft.id, text: aircraftLabel(aircraft) })));
     assignment.value = log.aircraftId || "";
     const remember = element("input", { type: "checkbox", disabled: summary.aircraftSerial ? null : "" });
     remember.checked = Boolean(summary.aircraftSerial);
@@ -1447,7 +1448,7 @@ function openFlightImport() {
   $("#flight-import-form").reset();
   const select = $("#flight-import-form").elements.aircraftId;
   select.replaceChildren(element("option", { value: "", text: "Automatically match aircraft serials" }),
-    ...state.aircraft.map(aircraft => element("option", { value: aircraft.id, text: aircraftLabel(aircraft) })));
+    ...alphabeticalAircraft().map(aircraft => element("option", { value: aircraft.id, text: aircraftLabel(aircraft) })));
   select.value = "";
   $("#flight-import-results").replaceChildren();
   openDialog("flight-import");
