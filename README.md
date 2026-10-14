@@ -1,99 +1,90 @@
 # FPVBench
 
-A local workbench for remembering FPV setups and learning from flight sessions.
+**Remember your setups. Organize your flights. See what changed.**
 
-Import Betaflight configuration exports, preserve setup history, compare changes, and connect flight observations to the setup used. Import copied DJI flight records to fill in session details. v0.4 stores your workspace in SQLite and offers an optional OpenAI assistant.
+FPVBench brings Betaflight setup history, copied DJI flight records, and your own flight observations together in one local drone workbench. Keep a reference setup, compare changes, and give every aircraft a history you can return to.
 
-## Start and stop
+Built for FPV pilots with a growing fleet, with a place for DJI photography-drone records too.
 
-Requires Node.js **22.13 or newer** and npm.
+## What you can do
+
+| Between flights | In FPVBench |
+| --- | --- |
+| Remember a setup you liked | Save named Betaflight snapshots and choose a preferred baseline for each aircraft. |
+| Understand what changed | Compare settings across snapshots, including PID/rate profiles, with readable changes and missing values marked as unknown. |
+| Sort a pile of flight records | Bulk import copied DJI files, match unique aircraft serials, and keep unknown records in an assignable inbox. |
+| Keep track of AirData uploads | Filter your local library and manually mark records as not uploaded or uploaded. |
+| Connect setups with observations | Record equipment, conditions, notes, results, and footage references in flight sessions; link the setup you used. |
+| Keep your fleet's history | Store registration IDs and serials; retire an aircraft from the active fleet while keeping its records. |
+| Get a quick explanation | Enable optional AI for setup explanations and a flight recap focused on the selected aircraft. |
+
+## Remember the setup behind the flight
+
+Import a Betaflight `dump all` or `diff all` export and give it a name you will recognize later. Your original export stays available alongside its readable settings. Pick a preferred baseline, import the next version, and see what changed.
+
+After flying, add your observations and link the setup you used. Each aircraft builds a record of settings, experiments, and what you noticed in the air.
+
+A saved snapshot does not confirm the aircraft's current settings. Setup confirmation is explicit, and FPVBench does not apply configurations to a controller. [Betaflight import guide →](repository-docs/betaflight-imports.md)
+
+## Organize a mixed fleet's flight records
+
+Copy DJI flight records from your controller or goggles, then import a whole batch. FPVBench uses aircraft serial evidence to route unique matches, even when you share controllers across aircraft. Unknown or ambiguous records wait in the **Unassigned** inbox; assign them later and optionally remember the recorded serial for future imports.
+
+Exact original files are retained. Importing the same bytes again reuses the existing record. Available timestamps create linked sessions once an aircraft is assigned; add your own notes alongside the sourced measurements.
+
+Keep using AirData for comprehensive cloud analysis. FPVBench provides the local organization alongside it: which files you have imported, which aircraft they belong to, and which uploads you have manually recorded. It does not upload to AirData or verify upload history.
+
+Supported inputs are DJI FlightRecord TXT versions 1–14 and compatible decoded JSON exports. Newer encrypted TXT records supply their available local summary; supported older records and decoded JSON can also supply browsable telemetry. Compatibility depends on the file format, rather than the controller's name. [DJI imports and measurement details →](repository-docs/dji-flight-imports.md)
+
+## Optional AI, with you in control
+
+Add an OpenAI API key, enable assistance, choose a monthly app allowance, and run an explicit connection check. When the integration is available, you can:
+
+- **Explain a setup:** review explicit settings and changes against your preferred baseline, with an optional flying-goal question.
+- **Review new imports automatically:** opt in to an explanation after a Betaflight setup import.
+- **Recap one aircraft's flights:** get a short account of its recorded activity, typical durations, and available measurements, with readable highlights and expandable supporting facts.
+
+The core workbench works without AI. Assistance uses separately billed OpenAI API access; the monthly app allowance is a local estimate, not an account-wide spending cap. It does not generate or deploy controller configurations.
+
+Flight recaps send aggregate evidence and the selected aircraft's label. Exact coordinates, locations, original files, serials, registration IDs, session notes, and raw telemetry are excluded. [AI features, privacy, and billing →](repository-docs/optional-ai.md)
+
+## Your records, your preferences
+
+- **Local storage:** keep aircraft, setups, sessions, and imports on the computer running FPVBench. Core features need no cloud account.
+- **Complete backups:** export your workspace with original DJI files and available telemetry, then restore it when needed.
+- **Metric or Imperial:** choose display units for flight details, telemetry, and new recaps. Your browser remembers the choice.
+- **Active and retired fleets:** keep an older aircraft's history without keeping it in the active selector.
+- **Independent macOS startup:** run in the background, optionally start at login, and open the app from a clickable launcher.
+
+Imported duration is source-reported record/log time and may include time on the ground; it is not independently verified airborne time. Missing or unverified measurements are excluded from recap calculations. [Storage and backups →](repository-docs/storage-and-backups.md)
+
+## Get started
+
+Requires **Node.js 22.13 or newer** and npm. From the repository checkout:
 
 ```sh
 npm ci
 npm start
 ```
 
-Open **http://127.0.0.1:4173**. In manual mode, leave the terminal running and press **Ctrl+C** to stop it. Stored data survives a restart.
+Open **http://127.0.0.1:4173**. In manual mode, leave the terminal running and press **Ctrl+C** to stop. Your records survive a restart.
 
-On macOS, install the independent background service once:
+### Run independently on macOS
+
+Stop the manual server first, then install the background service:
 
 ```sh
 npm run service:install
 npm run service:open
 ```
 
-It starts at login and creates **FPVBench.app** in your home **Applications** folder. Closing a terminal or browser does not stop the service. **FPVBench Controls** in the same folder provides clickable Start, Stop, Restart and Status commands. After source updates, use **Restart FPVBench** or `npm run service:restart`.
+Installation creates **FPVBench.app** and **FPVBench Controls** in your home **Applications** folder. The controls provide Start, Stop, Restart, and Status. Closing the terminal or browser leaves the service running; it starts at login by default. Use `npm run service:install -- --no-login` for background operation without login startup. [Startup, updates, and removal →](repository-docs/macos-startup.md)
 
-Stop a manual server with Ctrl+C before installation; `npm run service:install -- --take-over` can hand off a verified server from this checkout. Use `--no-login` to install background operation without automatic login startup. Once installed, use `npm run service:stop` before running `npm start` or restoring a workspace. See [macOS startup and controls](repository-docs/macos-startup.md).
+Add an aircraft, import a setup or a batch of DJI files, and explore its history. AI can be configured later in Settings.
 
-Core application features and assets run locally without an account or cloud service. Optional AI uses the OpenAI API when you enable it. The DJI decoder is a pinned runtime dependency with embedded WebAssembly.
+## Guides and development
 
-## Setup workflow
-
-1. Create an aircraft.
-2. In Betaflight's CLI, export `dump all` and save the output to a text file. `diff all` exports are also accepted.
-3. Import the file and give the setup a meaningful label. The original text is preserved.
-4. Mark a setup you prefer as the aircraft's baseline.
-5. Import your next setup and compare it with the baseline or another snapshot.
-6. Record a flight session, select the snapshot used, and add equipment, conditions, results, notes, and footage references.
-
-A session's setup confirmation is explicit. A stored snapshot records an import; it does not establish the aircraft's current configuration. The two Betaflight examples are synthetic parser fixtures, not aircraft configurations.
-
-Aircraft default to **Active**. Use **Edit aircraft** to set **Aircraft status** to **Retired** when an aircraft leaves your fleet. The sidebar defaults to **Active aircraft**; choose **All aircraft** or **Retired aircraft** to view its history or reactivate it. Retirement preserves setups, baselines, flights, identifiers, and AirData status. Imported archived logs still match that aircraft's serial. The DJI flight library's **All aircraft** view includes retired aircraft.
-
-Aircraft records include optional **Registration ID** and **Serial number** fields. Select an aircraft and choose **Edit aircraft** to add, update, or clear either identifier, or change its name, type, and notes. Identifiers appear in **Aircraft details** on the overview and are retained in SQLite and workspace exports. Older workspaces and backups without these fields still open. Registration IDs and serial numbers are excluded from AI requests; keep exports containing them private.
-
-Each setting retains its scope and PID/rate profile. A missing value in a sparse `diff all` export is shown as **unknown**, because the underlying firmware default is not included. Firmware or board differences are flagged. See the [Betaflight import guide](repository-docs/betaflight-imports.md).
-
-## DJI flight imports
-
-Choose **Import DJI flights**. Automatic assignment is the default: each file is matched using its aircraft serial, independently of the selected aircraft or shared controller/goggles. Unknown or ambiguous aircraft go into an **Unassigned** inbox. To import a known single-aircraft batch manually, choose its aircraft in the import dialog. Select one or multiple copied DJI flight-record TXT files or supported decoded JSON exports. You can label the source device, such as DJI RC, DJI RC2, or DJI Goggles N3.
-
-Each successful import retains the exact original file. Matched aircraft with valid flight timestamps get linked sessions; inbox records get sessions when you assign them. Imported measurements remain separate from editable observations and setup confirmation. Reimporting identical bytes for the same aircraft reuses the existing record.
-
-Newer DJI records encrypt detailed telemetry. FPVBench imports the available unencrypted summary and labels the result **summary only**. It makes no external keychain request. Older records and decoded JSON may supply local telemetry. Device names alone do not establish format compatibility; DAT files and arbitrary JSON are unsupported.
-
-Each record also has a manual **AirData status**: not recorded, not uploaded, or uploaded. Change it after uploads you perform in AirData and filter the library by status. Existing upload history is not guessed.
-
-Use the library’s **All aircraft**, **Selected aircraft**, and **Unassigned** filters. Open an unassigned record to choose its aircraft and optionally remember the recorded serial for future imports, without overwriting the aircraft’s hardware serial. **Match unassigned flights** applies unique serial matches to the remaining inbox. Changing a flight’s aircraft retains its observations and AirData status and clears setup links from the previous aircraft.
-
-See [DJI flight imports](repository-docs/dji-flight-imports.md) for formats, measurements, and limits.
-
-## Display units
-
-Open **Settings → Display units** and choose **Metric** or **Imperial**. This browser remembers your choice, including when AI is disabled. Flight distances, heights, speeds, telemetry and newly requested recaps follow it. Stored/exported measurements remain in metres, seconds and metres per second; free-text notes are unchanged. Switching units makes no AI request.
-
-Imported durations describe source-reported record/log time; they may include time on the ground. FPVBench does not present that value as verified airborne time.
-
-## Optional AI
-
-Open **Settings** to add a server-held OpenAI API key, enable AI, and set a monthly FPVBench allowance. AI starts disabled with a zero allowance. A small billed connection test must succeed before AI controls appear.
-
-The setup assistant can explain explicit tuning changes relative to your preferred baseline and answer a short flying-goal question. Optional automatic reviews run after setup imports. A light flight recap summarizes the currently selected aircraft's flying activity and duration patterns from its imported records and manual sessions, with readable highlights and expandable evidence. These features do not apply configurations to an aircraft.
-
-Missing key, no available allowance, or a billing/authentication failure disables AI features. Core imports, comparison, and recordkeeping continue to work. The local allowance is an estimate for this app rather than your provider balance. See [optional AI](repository-docs/optional-ai.md) for setup, billing, privacy, and limitations.
-
-## Your data
-
-The default workspace lives at `~/.fpvbench/`, outside this repository:
-
-- `workspace.sqlite`: aircraft, setup snapshots, sessions, flight summaries, and decoded telemetry.
-- `imports/`: exact original DJI files, addressed by their SHA-256 fingerprint.
-- Legacy `workspace.json` and a timestamped backup: preserved during the first migration from v0.1.
-
-Migration validates the existing JSON and backs it up before writing SQLite. Existing IDs, notes, baselines, and setup links are preserved. Invalid data is rejected without reset.
-
-Set `FPVBENCH_DATA_DIR` to use a different local directory. Set `PORT` to choose another loopback port.
-
-```sh
-FPVBENCH_DATA_DIR=/path/to/local/fpvbench-data PORT=4174 npm start
-```
-
-Use **Export workspace** to download a complete version 3 JSON backup (version 2 backups remain restorable), including original DJI bytes and decoded telemetry. Restore instructions are in [storage and backups](repository-docs/storage-and-backups.md). Keep backups private: flight files can contain locations and device identifiers.
-
-Media references are text notes, paths, or URLs; media files are not uploaded. The server is intended for one workstation.
-
-## Development
+[All documentation](repository-docs/README.md) · [Betaflight imports](repository-docs/betaflight-imports.md) · [DJI flight imports](repository-docs/dji-flight-imports.md) · [Optional AI](repository-docs/optional-ai.md) · [Backups](repository-docs/storage-and-backups.md) · [Architecture](repository-docs/architecture.md)
 
 ```sh
 npm run check
@@ -101,14 +92,10 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Automated checks use synthetic inputs and an injected memory repository. A separate local operational proof checks actual SQLite persistence and migration in a disposable directory. See [validation](repository-docs/validation.md).
+Automated checks use synthetic data and injected memory repositories. Separate disposable operational proofs cover SQLite and decoder behavior. [Validation and how to reproduce it →](repository-docs/validation.md)
 
-[Documentation index](repository-docs/README.md) · [Architecture](repository-docs/architecture.md) · [v0.3 scope](repository-docs/scope-v0.3.md)
+## Project status
 
-## Future work
+FPVBench is an early-stage, single-workstation application. The repository is currently private; a public release and license have not been selected. GitHub Release installation packages with background/login setup choices are planned.
 
-GitHub Release installation packages with login/background setup choices are planned for an eventual public release.
-
-Direct USB/MSP capture, reviewed controller deployment, encrypted DJI telemetry with user-supplied keys, Blackbox analysis, media uploads, and cloud hosting remain future work.
-
-The repository remains private. No public release or open-source license has been selected.
+Direct controller capture/deployment, encrypted-telemetry keychain support, Blackbox analysis, media uploads, and cloud hosting are future work.
