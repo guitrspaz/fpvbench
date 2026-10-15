@@ -1,0 +1,44 @@
+/** Explicit disposable SQLite proof. No personal records or external provider calls. */
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {createStore} from '../src/store.mjs';
+import {createFilingService} from '../src/import-filing.mjs';
+import {restoreBackup,validateCompleteBackup} from '../src/restore.mjs';
+const root=await mkdtemp(join(tmpdir(),'fpvbench-filing-sqlite-'));
+const data=join(root,'workspace'),folder=join(root,'records'),restore=join(root,'restored');
+let store,filing,restored;
+try {
+  await mkdir(folder);store=await createStore(data);
+  const aircraft=await store.createAircraft({name:'Synthetic filing proof'});
+  const setup=await store.importSnapshot({aircraftId:aircraft.id,label:'Reference',filename:'synthetic.txt',rawText:await readFile(new URL('../examples/baseline-dump.txt',import.meta.url),'utf8')});
+  await store.createSession({aircraftId:aircraft.id,title:'Keep observations',flownAt:'2026-10-15T12:00:00Z',snapshotId:setup.id,confirmedSetup:true,notes:'Synthetic observation'});
+  await store.createJournalEntry(aircraft.id,{kind:'next-step',title:'Preserve inspection reminder'});
+  const known=Buffer.from('Previously imported original'),fresh=Buffer.from('New synthetic original');
+  const imported=await store.importLog({aircraftId:aircraft.id,filename:'earlier.ridlog',contentBase64:known.toString('base64')});
+  const time=new Date().toISOString();
+  await store.recordAirdataTransfer(imported.flightLog.id,{accountId:randomUUID(),attemptId:randomUUID(),jobId:'job_SYNTHETIC_FILING',status:'success',startedAt:time,updatedAt:time,message:'Synthetic receipt'});
+  await writeFile(join(folder,'renamed.ridlog'),known);await writeFile(join(folder,'new.ridlog'),fresh);await writeFile(join(folder,'copy.ridlog'),fresh);
+  filing=await createFilingService(data,{store,defaultFolder:folder});
+  await filing.updateSettings({folder,includeSubfolders:false});
+  const before=await store.exportWorkspace();
+  const scan=await filing.scanFolder();assert.deepEqual(await store.exportWorkspace(),before);
+  assert.equal(scan.summary.newOriginals,1);assert.equal(scan.summary.alreadyImportedFiles,1);assert.equal(scan.summary.extraCopies,1);
+  const result=await filing.importFiles({scanId:scan.id,fileIds:scan.files.filter(file=>file.importable).map(file=>file.id)});
+  assert.equal(result.results.length,1);assert.equal(result.results[0].ok,true);
+  const backup=await store.exportWorkspace();validateCompleteBackup(backup);
+  for(const key of ['aircraft','sessions','snapshots'])assert.deepEqual(backup[key],before[key]);
+  assert.deepEqual(backup.telemetry.find(item=>item.flightLogId===imported.flightLog.id),before.telemetry[0]);
+  assert.deepEqual(backup.originals.find(item=>item.flightLogId===imported.flightLog.id),before.originals[0]);
+  assert.deepEqual(backup.flightLogs.find(log=>log.id===imported.flightLog.id),before.flightLogs[0]);
+  assert.equal(backup.flightLogs.length,before.flightLogs.length+1);
+  assert.equal(JSON.stringify(backup).includes(folder),false);
+  assert.deepEqual(await readFile(join(folder,'renamed.ridlog')),known);assert.deepEqual(await readFile(join(folder,'new.ridlog')),fresh);assert.deepEqual(await readFile(join(folder,'copy.ridlog')),fresh);
+  await filing.close();await store.close();store=await createStore(data);filing=await createFilingService(data,{store});
+  assert.deepEqual(await store.exportWorkspace(),backup);assert.equal(await filing.getScan(),null);assert.equal((await filing.getSettings()).folder,folder);
+  assert.equal((await filing.scanFolder()).summary.newOriginals,0);
+  await restoreBackup(restore,backup);restored=await createStore(restore);assert.deepEqual(await restored.exportWorkspace(),backup);
+  console.log('Import filing SQLite proof passed: read-only scan, explicit import, exact-source dedupe, preserved history and receipt, unchanged source bytes, private preference, restart and complete restore.');
+} finally {await filing?.close();await store?.close();await restored?.close();await rm(root,{recursive:true,force:true});}

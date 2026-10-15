@@ -33,7 +33,7 @@ export function renderPlist(config) {
     '<key>Label</key>' + string(config.label) + '<key>ProgramArguments</key><array>' + [config.node, config.entry].map(string).join('') + '</array>' +
     '<key>WorkingDirectory</key>' + string(config.root) + '<key>EnvironmentVariables</key><dict><key>FPVBENCH_DATA_DIR</key>' + string(config.dataDir) +
     '<key>PORT</key>' + string(config.port) + '</dict>' +
-    '<key>RunAtLoad</key><true/><key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict><key>ThrottleInterval</key><integer>10</integer>' +
+    '<key>RunAtLoad</key><true/><key>MaterializeDatalessFiles</key><true/><key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict><key>ThrottleInterval</key><integer>10</integer>' +
     '<key>ExitTimeOut</key><integer>30</integer><key>Umask</key><integer>63</integer>' +
     '<key>StandardOutPath</key>' + string(join(config.logs, 'server.log')) + '<key>StandardErrorPath</key>' + string(join(config.logs, 'server-error.log')) +
     '</dict></plist>\n';

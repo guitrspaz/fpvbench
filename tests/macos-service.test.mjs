@@ -8,6 +8,7 @@ test('login job renders explicit paths, local workspace, private logs and crash-
   expect(plist).toContain('/private/tmp/Node &amp; Tools/node');
   expect(plist).toContain('<key>SuccessfulExit</key><false/>');
   expect(plist).toContain('<key>RunAtLoad</key><true/>');
+  expect(plist).toContain('<key>MaterializeDatalessFiles</key><true/>');
   expect(plist).toContain('/Users/Synthetic User/.fpvbench');
   expect(plist).not.toContain('apiKey');
   expect(config.url).toBe('http://127.0.0.1:4173');

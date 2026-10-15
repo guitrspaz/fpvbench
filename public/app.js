@@ -24,6 +24,7 @@ let aiSettings = { available: false };
 let airdataSettings = { available: false };
 let journalFilter="all";
 let journalEditing=null;
+let filingChosen=new Set(),filingScanId=null,filingResults=[],filingFilter="all";
 
 function element(tag, attributes = {}, ...children) {
   const node = document.createElement(tag);
@@ -216,6 +217,7 @@ const viewCopy = {
     "Connect your setup to conditions, observations, and results.",
   ],
   journal: ["AIRCRAFT MEMORY", "Aircraft journal", "Remember what changed, what you noticed, and what to try next."],
+  filing: ["LOCAL ORIGINALS", "Import filing", "Scan a folder, review its files, and import the originals you choose."],
   flights: ["FROM YOUR FLIGHT RECORDS", "Flight log library", "Original files, sourced flight details, and available local telemetry."],
   settings: ["OPTIONAL ASSISTANCE", "Settings", "Keep the workbench offline, or enable an optional OpenAI assistant."],
 };
@@ -225,20 +227,21 @@ async function render() {
   const [eyebrow, title, description] = viewCopy[currentView];
   $("#page-eyebrow").textContent = eyebrow;
   $("#page-title").textContent = currentView==="journal"&&selectedAircraft()? `${selectedAircraft().name} journal` : title;
-  $("#page-description").textContent = selectedAircraft() && !["settings", "flights"].includes(currentView)
+  $("#page-description").textContent = selectedAircraft() && !["settings", "flights", "filing"].includes(currentView)
     ? `${selectedAircraft().name} · ${description}`
     : description;
   $("#breadcrumb").textContent =
     `WORKBENCH / ${currentView === "history" ? "SETUP HISTORY" : currentView.toUpperCase()}`;
   document.querySelectorAll(".nav-item").forEach((item) => {
-    const active = item.dataset.view === currentView || (currentView==="journal"&&item.dataset.view==="overview");
+    const active = item.dataset.view === currentView || (currentView==="journal"&&item.dataset.view==="overview") || (currentView==="filing"&&item.dataset.view==="flights");
     item.classList.toggle("active", active);
-    if (active) item.setAttribute("aria-current", currentView==="journal"?"location":"page");
+    if (active) item.setAttribute("aria-current", ["journal","filing"].includes(currentView)?"location":"page");
     else item.removeAttribute("aria-current");
   });
-  $(".heading-actions").hidden = currentView === "settings";
+  $(".heading-actions").hidden = ["settings","filing"].includes(currentView);
   if (currentView === "settings") return showSettings();
-  if (currentView !== "flights" && !aircraftId) return showOnboarding();
+  if (!["flights","filing"].includes(currentView) && !aircraftId) return showOnboarding();
+  if (currentView === "filing") return showFiling(revision);
   if (currentView === "overview") showOverview();
   if (currentView === "history") {
     if (detailId && snapshots().some((item) => item.id === detailId))
@@ -1447,9 +1450,158 @@ function airdataBadge(log) {
   return badge(`AirData: ${airdataLabels[status] || airdataLabels.unknown}`, status === "uploaded" ? "green" : "");
 }
 
+
+function filingEntryPanel() {
+  return element("section",{class:"panel"},panelHeading("Import filing","Review a local flight-record folder for new originals, duplicates, assignment, and AirData follow-up.",
+    button("Review flight-record folder",()=>navigate("filing"),"primary")));
+}
+
+async function showFiling(revision) {
+  content.replaceChildren(element("p",{class:"loading",text:"Loading folder review…"}));
+  try {
+    const [settings,initial]=await Promise.all([api("/api/filing/settings"),api("/api/filing/scan")]);
+    if(revision!==renderRevision||currentView!=="filing")return;
+    let report=initial,working=false,page=0;
+    if(filingScanId!==report?.id){filingChosen.clear();filingResults=[];filingScanId=report?.id??null;}
+    const form=element("form",{id:"filing-scan-form"});
+    const folder=element("input",{name:"folder",type:"text",value:settings.folder,required:"",maxlength:"4096",spellcheck:"false",autocomplete:"off"});
+    const recursive=element("input",{type:"checkbox",name:"includeSubfolders"});recursive.checked=settings.includeSubfolders;
+    const scanButton=element("button",{type:"submit",class:"primary",text:"Scan folder"});
+    form.append(element("label",{},"Flight-record folder",folder),element("label",{class:"checkbox-label"},recursive,element("span",{text:"Include subfolders"})),
+      element("p",{class:"form-help",text:"The location is saved on this computer. Scanning reads files; it does not import, upload, move, or delete them."}),scanButton);
+    const location=element("section",{class:"panel"},panelHeading("Scan your flight records","New means the original bytes are not in FPVBench yet. Importing validates the format."),form);
+    const status=element("p",{role:"status","aria-live":"polite",class:"filing-progress"});
+    const results=element("section",{class:"panel filing-results",id:"filing-review"});
+    const filter=element("select",{"aria-label":"Filter folder review"});
+    for(const [value,text] of [["all","All reviewed files"],["new","New originals"],["imported","Already imported"],["duplicates","Extra copies"],["unassigned","Unassigned imports"],["airdata","AirData to review"],["needs-send","Marked needs sending"],["unconfirmed","Not confirmed in AirData"],["processing","Processing in AirData"],["confirmed","Confirmed or manually marked sent"],["uncertain","Submission outcome unknown"],["blocked","Blocked files"]])filter.append(element("option",{value,text}));
+    filter.value=filingFilter;
+    const source=element("input",{type:"text",name:"sourceDevice",maxlength:"200",placeholder:"Optional; does not determine the aircraft"});
+    const importButton=button("Import selected files",async()=>{
+      if(!report||!filingChosen.size)return;
+      const scanId=report.id,ids=[...filingChosen],sourceDevice=source.value;
+      setWorking(true);filingResults=[];
+      try {
+        for(let offset=0;offset<ids.length;offset+=20) {
+          status.textContent=`Importing selected files ${offset+1}–${Math.min(offset+20,ids.length)} of ${ids.length}…`;
+          const outcome=await api("/api/filing/import",{scanId,fileIds:ids.slice(offset,offset+20),sourceDevice});
+          filingResults.push(...outcome.results.map(result=>({...result,relativePath:report.files.find(file=>file.id===result.fileId)?.relativePath??"Selected file"})));
+          report=outcome.scan;
+          for(const id of ids.slice(offset,offset+20))filingChosen.delete(id);
+        }
+        notify(`${filingResults.filter(item=>item.ok&&!item.duplicate).length} imported · ${filingResults.filter(item=>item.ok&&item.duplicate).length} already present · ${filingResults.filter(item=>!item.ok).length} failed. Successful imports are retained.`);
+      } catch(error){notify(error.message,true);}
+      finally {
+        setWorking(false);
+        if(currentView==="filing"&&revision===renderRevision)await refresh();
+      }
+    },"primary");
+    const selection=element("p",{class:"result-count"});
+    const selectNew=button("Select matching new files",()=>{for(const file of filtered())if(file.importable)filingChosen.add(file.id);drawRows();});
+    const clear=button("Clear selection",()=>{filingChosen.clear();drawRows();});
+    const refreshReview=button("Refresh saved statuses",async()=>{
+      setWorking(true);
+      try{report=await api("/api/filing/scan");filingChosen.clear();draw();}
+      catch(error){notify(error.message,true);}finally{setWorking(false);}
+    });
+    const rows=element("div",{id:"filing-rows"}),counts=element("div",{class:"stats filing-counts"}),summary=element("div"),history=element("div",{class:"filing-batch-results"});
+    const pager=element("div",{class:"telemetry-pagination"});
+    const pageCount=element("p",{class:"result-count"});
+    const previous=button("← Previous files",()=>{page--;drawRows();});
+    const next=button("Next files →",()=>{page++;drawRows();});
+    pager.append(previous,pageCount,next);
+    const controls=element("div",{class:"toolbar filing-controls"},filter,selectNew,clear,refreshReview);
+    results.append(panelHeading("Folder review","Counts apply to this folder snapshot. Import and assignment statuses are read from the current library."),
+      summary,counts,controls,element("label",{},"Source device (optional)",source),element("div",{class:"toolbar"},importButton,selection),status,rows,pager,history,
+      element("p",{class:"proof-note",text:"AirData to review includes eligible imports marked needs sending, failed, or not confirmed. Not confirmed does not mean the file is missing from AirData. Pending, confirmed, and uncertain submissions are not queued for another send."}),
+      button("Open flight log library →",()=>navigate("flights"),"text-button"));
+    function filtered() {
+      return (report?.files??[]).filter(file=>{
+        const upload=file.airdata;
+        return filingFilter==="all"||(
+          filingFilter==="new"?file.importable:
+          filingFilter==="imported"?Boolean(file.logId):
+          filingFilter==="duplicates"?Boolean(file.duplicateOf):
+          filingFilter==="unassigned"?file.logId&&file.aircraftId===null:
+          filingFilter==="airdata"?upload?.needsReview:
+          filingFilter==="processing"?["pending","running"].includes(upload?.state):
+          filingFilter==="confirmed"?["success","manual-sent"].includes(upload?.state):
+          filingFilter==="uncertain"?upload?.state==="unknown":
+          filingFilter==="blocked"?Boolean(file.error):upload?.state===filingFilter);
+      });
+    }
+    function setWorking(value) {
+      working=value;
+      for(const control of [...form.elements,...controls.querySelectorAll("button,select"),source])control.disabled=value||settings.locked;
+      drawRows();
+    }
+    function drawRows() {
+      const files=filtered(),pages=Math.ceil(files.length/100);page=Math.max(0,Math.min(page,pages-1));
+      rows.replaceChildren(...files.slice(page*100,page*100+100).map(file=>{
+        const checkbox=element("input",{type:"checkbox","aria-label":"Select "+file.relativePath,disabled:!file.importable||working?"":null});
+        checkbox.checked=filingChosen.has(file.id);
+        checkbox.addEventListener("change",()=>{if(checkbox.checked)filingChosen.add(file.id);else filingChosen.delete(file.id);selection.textContent=`${filingChosen.size} selected`;importButton.disabled=!filingChosen.size||working;});
+        const label=file.error?"BLOCKED":file.duplicateOf?"EXTRA COPY":file.logId?"ALREADY IMPORTED":"NEW ORIGINAL";
+        const item=element("article",{class:"filing-file"},
+          element("div",{class:"filing-file-heading"},checkbox,element("h3",{text:file.relativePath}),badge(label,file.error?"red":file.logId?"green":"amber")),
+          element("p",{class:"item-meta",text:`${metric(file.byteLength/1024,"KiB")} · ${file.modifiedAt?date(file.modifiedAt,true):"Modification date unavailable"}`}),
+          element("p",{text:file.logId?`Aircraft: ${file.aircraftName??"Unassigned"}`:"Aircraft: determined when imported; unknown identities remain unassigned."}));
+        if(file.duplicateOf)item.append(element("p",{class:"form-help",text:`Same original bytes as ${file.duplicateOf}.`}));
+        if(file.airdata){
+          item.append(badge("AirData: "+(transferLabels[file.airdata.state]??"Not confirmed"),file.airdata.state==="success"?"green":""));
+          if(!file.airdata.eligible)item.append(element("p",{class:"form-help",text:"This retained format is not enabled for AirData sending."}));
+        }
+        else item.append(element("p",{class:"form-help",text:"AirData status is available after import."}));
+        if(file.error)item.append(element("p",{class:"form-error",text:file.error}));
+        if(file.logId)item.append(element("div",{},button("Open imported record",async()=>{try{await refresh();if(currentView==="filing")viewFlight(file.logId);}catch(error){notify(error.message,true);}},"text-button")));
+        return item;
+      }));
+      if(!files.length)rows.append(element("p",{class:"muted",text:report?"No files match this filter.":"Choose a folder and scan it to begin."}));
+      selection.textContent=`${filingChosen.size} selected`;importButton.disabled=!filingChosen.size||working||!report||settings.locked;
+      previous.disabled=working||page===0;next.disabled=working||page+1>=pages;
+      pageCount.textContent=`${files.length? page*100+1:0}–${Math.min((page+1)*100,files.length)} of ${files.length} files`;
+      pager.hidden=files.length<=100;
+    }
+    function draw() {
+      counts.replaceChildren();summary.replaceChildren();history.replaceChildren();
+      if(report) {
+        const s=report.summary;
+        for(const [label,value,note] of [["New originals",s.newOriginals,"Unique original bytes"],["Already imported",s.alreadyImportedFiles,"Files matching the library"],["Extra copies",s.extraCopies,"Additional copies in this scan"],["Unassigned imports",s.unassignedImports,"Unique imported records"],["AirData to review",s.airdataToReview,"Unique eligible imports"]])counts.append(stat(label,value,note));
+        if(s.blockedFiles)counts.append(stat("Blocked files",s.blockedFiles,"Could not read these originals"));
+        summary.append(element("p",{class:"item-meta",text:`${report.complete?"Folder scan finished":"Partial folder scan"} · ${date(report.scannedAt,true)} · ${report.folder}`}),
+          element("p",{class:"form-help",text:`Import selection expires ${date(report.expiresAt,true)}. These counts overlap; duplicate files may also be unassigned or need review.`}));
+        if(report.warnings.length)summary.append(warningBox(report.warnings));
+        if(report.files.some(file=>file.error?.startsWith("Folder access was denied.")))summary.append(element("p",{class:"warning-box",text:"Folder access was denied for some files. Allow the background Node process access in macOS Privacy & Security, then scan again, or choose an accessible source folder."}));
+        const skipped=Object.entries(report.skipped).filter(([,value])=>value);
+        if(skipped.length)summary.append(element("p",{class:"form-help",text:"Skipped: "+skipped.map(([key,value])=>`${value} ${key}`).join(" · ")}));
+        if(s.uncertainSubmissions)summary.append(element("p",{class:"warning-box",text:`${s.uncertainSubmissions} submissions have an unknown outcome. Check AirData before considering a resend.`}));
+      }
+      if(filingResults.length) {
+        history.append(element("h3",{text:"Import results"}));
+        for(const result of filingResults)history.append(element("p",{class:result.ok?"form-help":"form-error",text:`${result.relativePath}: ${result.ok?(result.duplicate?"Already present":result.aircraftId?"Imported and assigned":"Imported; assignment needed"):result.error}`}));
+      }
+      drawRows();
+    }
+    filter.addEventListener("change",()=>{filingFilter=filter.value;filingChosen.clear();page=0;drawRows();});
+    form.addEventListener("submit",async event=>{
+      event.preventDefault();setWorking(true);status.textContent="Scanning the folder…";filingChosen.clear();filingResults=[];
+      try {
+        await api("/api/filing/settings",{folder:folder.value,includeSubfolders:recursive.checked},"PATCH");
+        report=await api("/api/filing/scan",{});filingScanId=report.id;page=0;
+        if(revision===renderRevision&&currentView==="filing"){status.textContent="Folder scan ready. Select files to import.";draw();}
+      }catch(error){if(revision===renderRevision){status.textContent=error.message;report=null;draw();}}
+      finally{setWorking(false);}
+    });
+    if(settings.locked)location.append(element("p",{class:"form-error",text:settings.reason}));
+    content.replaceChildren(button("← Flight log library",()=>navigate("flights"),"text-button"),location,results);
+    draw();setWorking(false);
+  } catch(error) {
+    if(revision===renderRevision)content.replaceChildren(empty("Folder review unavailable",error.message,()=>navigate("flights"),"Back to flight log library"));
+  }
+}
+
 function showFlightLogs() {
   const logs = flightLogs();
-  if (!(state.flightLogs || []).length) return content.replaceChildren(empty("Bring your flight records into the workbench",
+  if (!(state.flightLogs || []).length) return content.replaceChildren(filingEntryPanel(),empty("Bring your flight records into the workbench",
     "Import copied DJI records and other log originals. Archive-only files stay out of flight statistics until their measurements can be decoded.",
     openFlightImport, "↑ Import flight logs"));
   const panel = element("section", { class: "panel" }, panelHeading(`${logs.length} imported ${logs.some(log => log.status === "archived") ? "records" : logs.length === 1 ? "flight" : "flights"}`,
@@ -1499,7 +1651,7 @@ function showFlightLogs() {
   panel.append(element("div", { class: "toolbar" }, scope, filter, match), element("div", { class: "toolbar" }, selectVisible, send, check),
     element("p", { class: "form-help", text: airdataSettings.available ? "Sending transfers original files to AirData. Manual marks remain separate from confirmed processing; uncertain submissions are not automatically retried." : airdataSettings.reason || "Configure AirData in Settings to send original files." }), count, rows);
   update();
-  content.replaceChildren(panel);
+  content.replaceChildren(filingEntryPanel(),panel);
 }
 
 function metric(value, unit = "", fractionDigits = 1) {

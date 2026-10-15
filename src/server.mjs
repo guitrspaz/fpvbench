@@ -1,3 +1,4 @@
+import { createFilingService } from "./import-filing.mjs";
 import { createServer as httpServer } from "node:http";
 import { createAirdataService } from './airdata.mjs';
 import { readFile, realpath } from "node:fs/promises";
@@ -97,6 +98,7 @@ export async function createServer({
   aiFactory,
   assistantFactory,
   airdataFactory = createAirdataService,
+  filingFactory = createFilingService,
 } = {}) {
   const store = await storeFactory(dataDir);
   let ai, assistant;
@@ -117,6 +119,7 @@ export async function createServer({
     };
   }
   const airdata = await airdataFactory(dataDir, { store });
+  const filing = await filingFactory(dataDir, { store, airdata });
   const automaticTasks = new Set();
   const automaticReviews = new Map();
   let closing = false;
@@ -126,6 +129,7 @@ export async function createServer({
       closing = true;
       closeResourcesPromise = (async () => {
         await Promise.allSettled(automaticTasks);
+        await filing.close();
         try { await assistant.close(); }
         finally { try { await ai.close(); } finally { try { await airdata.close(); } finally { await store.close(); } } }
       })();
@@ -181,6 +185,11 @@ export async function createServer({
         }
         throw new AppError("API route was not found.",404);
       }
+      if(path==="/api/filing/settings"&&req.method==="GET")return json(res,200,await filing.getSettings());
+      if(path==="/api/filing/settings"&&req.method==="PATCH")return json(res,200,await filing.updateSettings(await body(req,8192)));
+      if(path==="/api/filing/scan"&&req.method==="GET")return json(res,200,await filing.getScan());
+      if(path==="/api/filing/scan"&&req.method==="POST"){emptyAiBody(await body(req,1024));return json(res,200,await filing.scanFolder());}
+      if(path==="/api/filing/import"&&req.method==="POST")return json(res,200,await filing.importFiles(await body(req,8192)));
       if (path === "/api/airdata/settings" && req.method === "GET") return json(res, 200, await airdata.getSettings());
       if (path === "/api/airdata/settings" && req.method === "PATCH") return json(res, 200, await airdata.updateSettings(await body(req, 4096)));
       if (path === "/api/airdata/check" && req.method === "POST") { emptyAiBody(await body(req, 1024)); return json(res, 200, await airdata.checkConnection()); }

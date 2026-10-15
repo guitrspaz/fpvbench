@@ -40,6 +40,12 @@ An optional `journalEntries` array is retained inside each aircraft's existing S
 
 Journal saves do not alter setup exports, imported measurements, original files, session observations or upload receipts. A session reassignment removes old journal session links while retaining their captured titles. The full workspace backup includes journal notes and should remain private.
 
+## Folder preferences in v0.7
+
+`.filing-config.json` holds the local source-folder path and subfolder preference with owner-only permissions. A current scan is memory-only and clears on restart, expiry or a folder-setting change. Neither is included in the portable catalog export. Restoring into a fresh directory uses the default folder until another is selected. A corrupt preference file disables folder filing while preserving the file and the rest of the app.
+
+Folder scanning does not change the catalog or source files. Explicit imports retain originals and relationships through the existing store, with no schema migration. `node dev/verify-import-filing.mjs` checks scanning, selected import, preserved history and receipts, unchanged source bytes, restart and complete restore in disposable SQLite workspaces.
+
 ## Complete export
 
 Use **Export workspace** in the interface. Version 3 JSON contains:

@@ -22,7 +22,13 @@ FPVBENCH_SCREENSHOT_DIR=/absolute/local/screenshot-directory npm run test:browse
 
 The runner also accepts --screenshot-dir=/absolute/local/directory as a command-line argument. Screenshots contain synthetic test data and are not added to the repository automatically.
 
-## Observed result — v0.4.6, 2026-10-14
+## Observed result — v0.7.0, 2026-10-15
+
+The complete synthetic run passed 123 checks with no unexpected page exceptions. Nineteen filing checks cover opening without scanning, a read-only explicit scan, renamed existing originals, extra-copy selection rules, partial import results, aircraft serial routing, unassigned records, refreshed assignment and manual AirData status, format eligibility, reload without rescanning, later-arriving files, blocked-file guidance, and a 24-file selection sent in batches of twenty and four.
+
+The runner uses a separate disposable source folder. Original bytes remained unchanged and the folder preference was absent from the portable export. Desktop and 390-pixel mobile filing screenshots were inspected. Filing added no provider calls; existing journeys retained seven fake OpenAI and four fake AirData requests. The run opened no database and used no personal workspace, actual upload or billed request.
+
+## Historical result — v0.4.6, 2026-10-14
 
 The full synthetic journey passed with the existing fleet, setup, imports, AirData and optional-AI workflows. Additional checks verify Metric/Imperial settings before aircraft or API-key setup, preference persistence after reload, converted detail distances/heights/speeds, matching telemetry column units, and unchanged server data. Recorded/log duration labels and recap highlights passed. Unit changes produced no provider call. All provider calls used the fake provider; no personal data or live paid calls were used.
 

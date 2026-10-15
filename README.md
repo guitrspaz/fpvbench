@@ -13,6 +13,7 @@ Built for FPV pilots with a growing fleet, with a place for DJI photography-dron
 | Remember a setup you liked | Save named Betaflight snapshots and choose a preferred baseline for each aircraft. |
 | Understand what changed | Compare settings across snapshots, including PID/rate profiles, with readable changes and missing values marked as unknown. |
 | Sort a pile of flight records | Bulk import copied DJI files, match unique aircraft serials, and keep unknown records in an assignable inbox. |
+| See what still needs filing | Scan a local record folder for new originals, extra copies, unassigned imports, and AirData follow-up. |
 | Send originals to AirData | Select supported logs, submit them with an optional configured connection, and keep processing receipts alongside manual upload marks. |
 | Pick up where you left off | Keep an aircraft journal of changes, observations, and next steps; see open items and recent context on Overview. |
 | Connect setups with observations | Record equipment, conditions, notes, results, and footage references in flight sessions; link the setup you used. |
@@ -38,6 +39,8 @@ Mark a next step done, set it aside, or reopen it without losing its history. Th
 Copy DJI flight records from your controller or goggles, then import a whole batch. FPVBench uses aircraft serial evidence to route unique matches, even when you share controllers across aircraft. Unknown or ambiguous records wait in the **Unassigned** inbox; assign them later and optionally remember the recorded serial for future imports.
 
 Exact original files are retained. Importing the same bytes again reuses the existing record. Available timestamps create linked sessions once an aircraft is assigned; add your own notes alongside the sourced measurements.
+
+Review a copied-record folder before importing. See which originals are new, which are duplicates, and which imported records need assignment or AirData follow-up. Select the new files you want to keep; scanning leaves the source folder unchanged. [Import filing guide →](repository-docs/import-filing.md)
 
 Keep using AirData for comprehensive cloud analysis. Configure the optional connection to send selected supported originals and retain their processing results. Manual upload marks remain separate; files uploaded earlier through another route are not automatically discovered. A user upload token and an AirData-issued developer application key are required. [AirData connection and upload status →](repository-docs/airdata.md)
 

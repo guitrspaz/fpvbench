@@ -24,11 +24,19 @@ node dev/verify-ai.mjs
 node dev/verify-distance.mjs
 node dev/verify-log-intake-airdata.mjs
 node dev/verify-journal.mjs
+node dev/verify-import-filing.mjs
 ```
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.6.1 results — 2026-10-15
+## Observed v0.7.0 results — 2026-10-15
+
+- ESLint and all 191 Jest tests passed across twenty suites. Filing checks cover read-only scans, exact-byte duplicates, changed/missing sources, symlink substitution, workspace exclusion, limits, strict API input, stale scans, private preferences, partial success, permission errors, a verified second read after metadata-only changes, and account-specific AirData states. The macOS service check verifies the file-materialization policy.
+- The full synthetic browser run passed 123 checks. Added filing evidence covers explicit scanning, new-only selection, renamed copies, partial failures, serial routing, unassigned records, refreshed assignments/upload marks, later-arriving files, blocked-file guidance and a 24-file selection split into batches of twenty and four. Desktop and mobile screenshots were inspected.
+- Filing operations added no provider calls. Existing regression journeys retained seven fake OpenAI calls and four fake AirData calls. Automated checks used memory repositories and opened no database.
+- The separate disposable SQLite proof passed read-only scanning, selected import, retained history and receipt, unchanged source bytes, private folder preference, restart and complete restore. No personal records or real provider requests were used.
+
+## Historical v0.6.1 results — 2026-10-15
 
 - ESLint and all 175 Jest tests passed; the complete synthetic browser run passed 104 checks with no unexpected browser errors.
 - Added browser evidence covers named overview/journal/brief ownership, the overview journal entry point, the read-only aircraft field, and a DJI inspection/battery entry with no linked setup or session. Existing aircraft isolation, lifecycle, delayed-response, mobile and export journeys remain covered.

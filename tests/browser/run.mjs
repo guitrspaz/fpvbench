@@ -1,4 +1,6 @@
 import { runJournalJourney } from './journal-journey.mjs';
+import { runFilingJourney } from './filing-journey.mjs';
+import { createFilingService } from '../../src/import-filing.mjs';
 import { browserAirdata, runAirdataJourney } from './airdata-journey.mjs';
 import { mkdtemp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -18,13 +20,15 @@ const moduleDir = process.env.FPVBENCH_PLAYWRIGHT_DIR;
 const { chromium } = await import(moduleDir ? pathToFileURL(join(moduleDir, 'index.mjs')).href : 'playwright');
 const { expect } = await import(moduleDir ? pathToFileURL(join(moduleDir, 'test.mjs')).href : 'playwright/test');
 const dataDir = await mkdtemp(join(tmpdir(), 'fpvbench-browser-'));
+const filingFolder = await mkdtemp(join(tmpdir(), 'fpvbench-browser-records-'));
 const screenshotDir = process.env.FPVBENCH_SCREENSHOT_DIR || process.argv.find(arg => arg.startsWith('--screenshot-dir='))?.slice('--screenshot-dir='.length);
 let server, browser;
 const provider = createBrowserAi();
 const airdata = browserAirdata();
 try {
   if (screenshotDir) await mkdir(screenshotDir, { recursive: true, mode: 0o700 });
-  server = await createServer({ dataDir, storeFactory: createBrowserStore, aiFactory: provider.aiFactory, airdataFactory: airdata.factory });
+  server = await createServer({ dataDir, storeFactory: createBrowserStore, aiFactory: provider.aiFactory, airdataFactory: airdata.factory,
+    filingFactory: (directory,options)=>createFilingService(directory,{...options,defaultFolder:filingFolder}) });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const baseURL = `http://127.0.0.1:${server.address().port}`;
   browser = await chromium.launch({ headless: true, ...(process.env.FPVBENCH_CHROMIUM ? { executablePath: process.env.FPVBENCH_CHROMIUM } : {}) });
@@ -41,10 +45,12 @@ try {
   const lifecycle = await runStatusJourney({ page, expect, baseURL, baselineText });
   const uploads = await runAirdataJourney({ page, expect, baseURL, airdata });
   const journal=await runJournalJourney({page,expect,baseURL,baselineText,screenshotDir,provider,airdata});
+  const filing=await runFilingJourney({page,expect,baseURL,folder:filingFolder,screenshotDir,provider,airdata});
   expect((await readdir(dataDir)).some(name => name.startsWith('workspace.sqlite'))).toBe(false);
-  console.log(JSON.stringify({ browser: browser.version(), ...result, dji, ai, fleet, lifecycle, uploads, journal, providerCalls: provider.calls.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
+  console.log(JSON.stringify({ browser: browser.version(), ...result, dji, ai, fleet, lifecycle, uploads, journal, filing, providerCalls: provider.calls.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
 } finally {
   if (browser) await browser.close();
   if (server?.listening) await new Promise((resolve) => server.close(resolve));
   await rm(dataDir, { recursive: true, force: true });
+  await rm(filingFolder, { recursive: true, force: true });
 }

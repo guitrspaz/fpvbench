@@ -3,6 +3,8 @@ import { decodeDjiFlight, MAX_DJI_BYTES } from './dji-import.mjs';
 
 export const ARCHIVE_FORMATS = ['unknown-log', 'px4-ulog', 'ardupilot-dataflash', 'mavlink-tlog', 'mavlink-jsonl', 'betaflight-blackbox'];
 const extensions = new Set(['txt','json','jsonl','ndjson','log','bin','tlog','ulg','bbl','bfl','ridlog','csv','gpx','kml']);
+/** Whether a filename belongs to the bounded original-log intake formats. */
+export const supportsLogFilename = filename => typeof filename === 'string' && extensions.has(filename.toLowerCase().split('.').at(-1));
 export const emptyLogSummary = () => ({ startTime: null, durationSeconds: null, distanceMeters: null, maxHeightMeters: null, maxHorizontalSpeedMps: null, aircraftSerial: null, aircraftName: null, aircraftModel: null, location: null, startCoordinate: null });
 
 /** Content recognizers are independent of summary decoders. Archives never become flight evidence by extension alone. */
@@ -10,7 +12,7 @@ export async function decodeLog(bytes, { filename, decodeDji = decodeDjiFlight }
   if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > MAX_DJI_BYTES) throw new AppError('Choose a nonempty log file up to 25 MiB.', 413);
   if (typeof filename !== 'string' || !filename.trim() || filename.length > 255 || [...filename].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) throw new AppError('Provide a valid log filename.');
   const extension = filename.toLowerCase().split('.').at(-1);
-  if (!extensions.has(extension)) throw new AppError('Choose a flight-log, telemetry, JSON, CSV, GPX or KML file.', 415);
+  if (!supportsLogFilename(filename)) throw new AppError('Choose a flight-log, telemetry, JSON, CSV, GPX or KML file.', 415);
   let format = 'unknown-log';
   const binaryDji = extension === 'txt' && bytes.length >= 100 && bytes[10] >= 1 && bytes[10] <= 14;
   if (binaryDji) return decodeDji(bytes, { filename });

@@ -2,7 +2,7 @@
 
 ## Local application
 
-FPVBench v0.6 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI and AirData requests use server-side fetch.
+FPVBench v0.7 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI and AirData requests use server-side fetch.
 
 The interface calls JSON endpoints for aircraft, setup imports/comparison, sessions, and flight-log records. Browser local storage remembers aircraft/fleet selection and display units; the server owns the data.
 
@@ -19,6 +19,7 @@ The interface calls JSON endpoints for aircraft, setup imports/comparison, sessi
 | `src/restore.mjs` | Validate complete backups, stage a database, and preserve the previous workspace. |
 | `src/sqlite-repository.mjs` | Prepared SQLite persistence and telemetry pagination. |
 | `src/log-import.mjs` | Recognize content and retain broader originals without inventing flight evidence. |
+| `src/import-filing.mjs` | Scan local source folders, classify exact originals against the catalog, and recheck selected files before import. |
 | `src/airdata.mjs` | Hold private credentials, verify the connection, send selected originals and poll recorded jobs. |
 | `src/airdata-transfer.mjs` | Validate receipts and identify upload-eligible formats. |
 | `src/dji-import.mjs` | Bound decoding requests and validate/normalize DJI evidence. |
@@ -80,6 +81,16 @@ Jest, Playwright, and ESLint are development dependencies. The `@istanbuljs/load
 ## Fleet routing and inbox
 
 Imported flight records can have a null aircraft relationship in catalog/SQLite version 3. Aircraft and sessions still require actual fleet identities. Serial matching uses only aircraft serials and explicit aliases; controller identity, labels and selection do not route mixed imports. Unassigned records retain original/telemetry evidence without a session until assignment. Assignment, alias learning and session creation/update commit together. Explicit batch rematching only changes unassigned records. Reassignment clears the old aircraft’s setup link and confirmation while retaining session observations. Exact-byte dedupe spans all aircraft and the inbox. Existing v2 SQLite is backed up before its transactional nullable-flight relationship migration; complete v2 JSON exports remain restorable.
+
+## Import filing
+
+The filing service saves a folder preference in owner-private `.filing-config.json`; the latest bounded scan remains in memory. Explicit scans hash eligible files without decoding or importing. SHA-256 links renamed copies to existing originals. Reports derive current assignment and account-scoped upload evidence from the catalog without provider requests.
+
+`GET/PATCH /api/filing/settings` reads or saves the location. `GET /api/filing/scan` reads the latest report; `POST` starts a scan. `POST /api/filing/import` accepts one scan ID and up to twenty opaque file IDs, never client-supplied file paths. A scan expires after thirty minutes, on restart, or on a settings change. Concurrent filing mutations are rejected while an operation is active; close waits for it to finish.
+
+Source reads reject symlinks and workspace paths, bound traversal and bytes, and compare file identity and metadata around streaming reads. Import also checks the scanned fingerprint and SHA-256 before using the normal import store. Sources remain unchanged, successful imports survive per-file failures, and selected new originals use existing serial routing and dedupe. No catalog migration is required. See [import filing](import-filing.md).
+
+A metadata-only ctime change during a scan permits one bounded second read with the same content hash; selected imports keep strict freshness checks. The macOS service sets the documented `MaterializeDatalessFiles` policy so reads can retrieve cloud-backed file contents. Operating-system downloads can add latency; traversal and read loops check the processing budget between filesystem calls.
 
 ## Aircraft journal and next-session brief
 

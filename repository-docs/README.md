@@ -4,6 +4,7 @@
 - [macOS startup](macos-startup.md): login service, clickable controls, updates, and removal.
 - [Betaflight imports](betaflight-imports.md): prepare exports and interpret their limits.
 - [Flight log imports](dji-flight-imports.md): DJI decoding, broader original archives, assignment, and format limits.
+- [Import filing](import-filing.md): scan a copied-record folder, review duplicates and follow-up, and import selected new originals.
 - [AirData uploads](airdata.md): optional connection, selected original uploads, and processing receipts.
 - [Change journal and next-session brief](change-journal.md): per-aircraft memory, open next steps, and recorded context.
 - [Optional AI](optional-ai.md): setup assistant, recap, API key, allowance, and privacy.

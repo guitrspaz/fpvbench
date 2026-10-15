@@ -39,6 +39,8 @@ Equivalent terminal commands are `npm run service:start`, `service:stop`, `servi
 
 Restart the managed service after source updates. If you move the checkout or delete the recorded Node.js version, stop the service, enter the new checkout with a supported Node.js runtime and rerun `npm run service:install`. Installation records an absolute executable path so login startup does not depend on shell profiles.
 
+When upgrading a service installed before v0.7, rerun `npm run service:install` to enable macOS file materialization for cloud-backed source folders. Preserve your installation choices: include `-- --no-login` if login startup was disabled, and reuse any custom `PORT` or `FPVBENCH_DATA_DIR`. This allows macOS to download file contents when FPVBench reads them; it does not start a folder scan or an upload. See [import filing](import-filing.md).
+
 Before restoring or copying workspace files, stop the service. See [storage and backups](storage-and-backups.md).
 
 `npm run service:uninstall` stops the service and removes its managed login definition, launcher and command files. Aircraft, flights, setups, optional AI files and logs remain intact.
