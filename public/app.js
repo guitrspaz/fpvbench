@@ -1617,16 +1617,24 @@ function showFlightLogs() {
     ...Object.entries(airdataLabels).map(([value, text]) => element("option", { value, text })),
     ...["success", "pending", "manual-sent", "needs-send", "unconfirmed", "error", "unknown-transfer"].map(value => element("option", { value: "transfer:" + value, text: value === "unknown-transfer" ? "Submission outcome unknown" : transferLabels[value] })));
   const chosen = new Set();
+  let working = false;
+  const selection = element("p", { class: "result-count", "aria-live": "polite" });
   const rows = element("div");
   const count = element("p", { class: "result-count" });
+  const matching = () => logs.filter(log => !filter.value || (filter.value.startsWith("transfer:") ? uploadState(log) === filter.value.slice(9).replace("unknown-transfer", "unknown") || (filter.value === "transfer:pending" && uploadState(log) === "running") : (log.airdataStatus || "unknown") === filter.value));
+  const updateSelection = () => {
+    selection.textContent = `${chosen.size} selected`;
+    mark.disabled = working || !chosen.size;
+  };
   const update = () => {
-    const selected = logs.filter(log => !filter.value || (filter.value.startsWith("transfer:") ? uploadState(log) === filter.value.slice(9).replace("unknown-transfer", "unknown") || (filter.value === "transfer:pending" && uploadState(log) === "running") : (log.airdataStatus || "unknown") === filter.value));
+    const selected = matching();
     count.textContent = `${selected.length} of ${logs.length} flights`;
     rows.replaceChildren(...selected.map(log => element("div", { class: "item-row" },
-    element("div", {}, element("input", { type: "checkbox", "aria-label": "Select " + log.filename, checked: chosen.has(log.id) ? "" : null, onchange: event => { if (event.target.checked) chosen.add(log.id); else chosen.delete(log.id); } }), button(log.filename, () => viewFlight(log.id), "item-title"),
+    element("div", {}, element("input", { type: "checkbox", "aria-label": "Select " + log.filename, checked: chosen.has(log.id) ? "" : null, disabled: working ? "" : null, onchange: event => { if (event.target.checked) chosen.add(log.id); else chosen.delete(log.id); updateSelection(); } }), button(log.filename, () => viewFlight(log.id), "item-title"),
       element("p", { class: "item-meta", text: `${log.summary.startTime ? date(log.summary.startTime, true) : "Flight date unavailable"} · ${log.sourceDevice || "Source device not recorded"} · ${state.aircraft.find(aircraft => aircraft.id === log.aircraftId)?.name || "Unassigned"} · ${log.logVersion === null ? log.format : "Version " + log.logVersion}` })),
     element("div", { class: "row-actions" }, log.aircraftId === null ? badge("UNASSIGNED", "amber") : null, flightStatus(log), airdataBadge(log), button("Inspect →", () => viewFlight(log.id), "text-button")))));
     if (!selected.length) rows.append(element("p", { class: "muted", text: "No imports match this AirData status." }));
+    updateSelection();
   };
   filter.addEventListener("change", () => { chosen.clear(); update(); });
   const match = button("Match unassigned flights", async event => {
@@ -1637,18 +1645,48 @@ function showFlightLogs() {
     } catch (error) { notify(error.message, true); target.disabled = false; }
   });
   match.disabled = !state.flightLogs.some(log => log.aircraftId === null);
-  const transferAction = path => async event => {
+  const transferAction = path => async () => {
     if (!chosen.size) return notify("Select at least one log record.", true);
     if (chosen.size > 20) return notify("Send or refresh up to 20 records at a time.", true);
-    event.currentTarget.disabled = true;
+    setWorking(true);
     try { const result = await api(path, { ids: [...chosen] }); notify(`${result.results.filter(item => !item.skipped).length} processed · ${result.results.filter(item => item.skipped).length} skipped. Inspect receipts for results.`); await refresh(); }
-    catch (error) { notify(error.message, true); event.currentTarget.disabled = false; }
+    catch (error) { notify(error.message, true); }
+    finally { setWorking(false); }
   };
   const send = button("Send selected logs to AirData", transferAction("/api/airdata/send"), "primary");
   const check = button("Refresh selected AirData status", transferAction("/api/airdata/refresh"));
   send.disabled = check.disabled = !airdataSettings.available;
-  const selectVisible = button("Select visible logs", () => { const visible = [...rows.querySelectorAll('input[type="checkbox"]')]; if (visible.length > 20) return notify("Filter the library or select up to 20 logs individually.", true); visible.forEach(input => { input.checked = true; input.dispatchEvent(new Event("change")); }); });
-  panel.append(element("div", { class: "toolbar" }, scope, filter, match), element("div", { class: "toolbar" }, selectVisible, send, check),
+  const selectAll = button("Select all matching", () => { chosen.clear(); for (const log of matching()) chosen.add(log.id); update(); });
+  const clear = button("Clear selection", () => { chosen.clear(); update(); });
+  const mark = button("Mark selected as uploaded", async () => {
+    const ids = [...chosen]; if (!ids.length) return;
+    let updated = 0, already = 0;
+    setWorking(true);
+    try {
+      for (let offset = 0; offset < ids.length; offset += 1000) {
+        selection.textContent = `Saving manual marks ${offset + 1}–${Math.min(offset + 1000, ids.length)} of ${ids.length}…`;
+        const result = await api("/api/flight-logs/mark-uploaded", { ids: ids.slice(offset, offset + 1000) });
+        updated += result.updated; already += result.alreadyUploaded;
+      }
+      notify(`${updated} marked as uploaded · ${already} already marked. No files were sent.`);
+    } catch (error) {
+      notify(`${updated} newly marked · ${already} already marked. ${error.message} Some selected records may still need a mark.`, true);
+    } finally {
+      setWorking(false);
+      try { await refresh(); } catch (error) { notify(error.message, true); }
+    }
+  }, "primary");
+  function setWorking(value) {
+    working = value;
+    scope.disabled = filter.disabled = selectAll.disabled = clear.disabled = value;
+    send.disabled = check.disabled = value || !airdataSettings.available;
+    match.disabled = value || !state.flightLogs.some(log => log.aircraftId === null);
+    update();
+  }
+  panel.append(element("div", { class: "toolbar" }, scope, filter, match), element("div", { class: "toolbar" }, selectAll, clear, mark, selection),
+    element("p", { class: "form-help", text: "Select all matching uses the current aircraft and AirData filters. Manual marks record uploads you already made; no files are sent or verified." }),
+    element("div", { class: "toolbar" }, send, check),
+    element("p", { class: "form-help", text: "Sending or refreshing submissions is limited to 20 selected logs at a time. Manual marking can cover all matching logs." }),
     element("p", { class: "form-help", text: airdataSettings.available ? "Sending transfers original files to AirData. Manual marks remain separate from confirmed processing; uncertain submissions are not automatically retried." : airdataSettings.reason || "Configure AirData in Settings to send original files." }), count, rows);
   update();
   content.replaceChildren(filingEntryPanel(),panel);

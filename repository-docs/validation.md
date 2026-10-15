@@ -25,11 +25,19 @@ node dev/verify-distance.mjs
 node dev/verify-log-intake-airdata.mjs
 node dev/verify-journal.mjs
 node dev/verify-import-filing.mjs
+node dev/verify-bulk-airdata.mjs
 ```
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.7.0 results — 2026-10-15
+## Observed v0.7.1 results — 2026-10-15
+
+- ESLint and all 197 Jest tests passed across twenty-two suites. Added store/API checks cover atomic manual marking, strict bounded inputs, missing IDs, persistence failure, dedupe/idempotence, concurrent assignment, retained evidence/receipts, credential-free operation and folder review updates without rescanning.
+- The complete synthetic browser run passed 133 checks. New checks verify filtered selection, count/clear behavior, marking twenty-five logs with no AirData key, preservation of all other exported evidence and receipts, reload, folder queue updates, failure reporting and mobile layout.
+- Bulk marking added no provider calls. Existing journeys retained seven fake OpenAI and four fake AirData calls. Automated checks used memory repositories without opening a database.
+- The separate disposable SQLite proof passed atomic marks, retained history/originals/receipts, idempotence, restart and complete restore. No personal log statuses were changed for this proof.
+
+## Historical v0.7.0 results — 2026-10-15
 
 - ESLint and all 191 Jest tests passed across twenty suites. Filing checks cover read-only scans, exact-byte duplicates, changed/missing sources, symlink substitution, workspace exclusion, limits, strict API input, stale scans, private preferences, partial success, permission errors, a verified second read after metadata-only changes, and account-specific AirData states. The macOS service check verifies the file-materialization policy.
 - The full synthetic browser run passed 123 checks. Added filing evidence covers explicit scanning, new-only selection, renamed copies, partial failures, serial routing, unassigned records, refreshed assignments/upload marks, later-arriving files, blocked-file guidance and a 24-file selection split into batches of twenty and four. Desktop and mobile screenshots were inspected.

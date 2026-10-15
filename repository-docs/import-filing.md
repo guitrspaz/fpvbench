@@ -31,6 +31,8 @@ Aircraft serials and remembered aliases route unique matches automatically. Shar
 
 **Not confirmed** means FPVBench has no confirmation for the current connection; the file may already be in AirData through another route. Use manual marks for uploads made elsewhere. A manual sent mark removes the record from the review queue.
 
+To mark a group, return to **Flight log library**, set the aircraft and AirData filters, choose **Select all matching**, then **Mark selected as uploaded**. Return here and choose **Refresh saved statuses**. These manual marks need no AirData key and send no files. See [bulk marking](airdata.md#mark-uploads-made-elsewhere).
+
 Processing, confirmed, and uncertain submissions are kept out of that queue. An uncertain outcome needs a check in AirData before considering another send. Sending remains a separate selected action in the library and requires the configured AirData connection. See [AirData uploads](airdata.md).
 
 ## Local preferences and scan limits

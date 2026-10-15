@@ -82,6 +82,12 @@ Jest, Playwright, and ESLint are development dependencies. The `@istanbuljs/load
 
 Imported flight records can have a null aircraft relationship in catalog/SQLite version 3. Aircraft and sessions still require actual fleet identities. Serial matching uses only aircraft serials and explicit aliases; controller identity, labels and selection do not route mixed imports. Unassigned records retain original/telemetry evidence without a session until assignment. Assignment, alias learning and session creation/update commit together. Explicit batch rematching only changes unassigned records. Reassignment clears the old aircraft’s setup link and confirmation while retaining session observations. Exact-byte dedupe spans all aircraft and the inbox. Existing v2 SQLite is backed up before its transactional nullable-flight relationship migration; complete v2 JSON exports remain restorable.
 
+## Bulk manual AirData marks
+
+`POST /api/flight-logs/mark-uploaded` accepts only explicit record IDs, with a 64 KiB request body and up to 1,000 IDs. The store deduplicates and resolves every ID before changing manual upload status, validates the records, and saves one serialized transaction per batch. Invalid IDs or a save failure leave the entire batch unchanged. Provider receipts and all other evidence remain intact; no provider service is called.
+
+The library selects records using its aircraft and AirData filters and clears selection when either changes. Manual marking works without credentials. Larger selections use sequential batches of 1,000 and retain successful earlier batches after a later failure. The existing send/refresh limit remains twenty. Folder review derives its queue from the updated catalog without a new filesystem scan.
+
 ## Import filing
 
 The filing service saves a folder preference in owner-private `.filing-config.json`; the latest bounded scan remains in memory. Explicit scans hash eligible files without decoding or importing. SHA-256 links renamed copies to existing originals. Reports derive current assignment and account-scoped upload evidence from the catalog without provider requests.

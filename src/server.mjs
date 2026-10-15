@@ -274,6 +274,8 @@ export async function createServer({
         emptyAiBody(await body(req, 1024));
         return json(res, 200, await store.matchUnassignedFlightLogs());
       }
+      if (req.method === "POST" && path === "/api/flight-logs/mark-uploaded")
+        return json(res, 200, await store.markFlightLogsUploaded(await body(req, 65536)));
       if (req.method === "POST" && path === "/api/flight-logs") {
         const result = await store.importFlightLog(await body(req, FLIGHT_BODY_LIMIT));
         return json(res, result.duplicate ? 200 : 201, result);

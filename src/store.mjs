@@ -227,6 +227,18 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
       }
       return { value: { matched, unassigned: next.flightLogs.filter(log => log.aircraftId === null).length } };
     }),
+    /** Record uploads performed elsewhere, atomically; provider receipts and all sourced evidence stay intact. */
+    markFlightLogsUploaded: input => mutate(next => {
+      objectInput(input, ['ids']);
+      if (!Array.isArray(input.ids) || input.ids.length < 1 || input.ids.length > 1000 || input.ids.some(id => typeof id !== 'string' || !id.length || id.length > 200)) throw new AppError('Choose 1 to 1,000 log records.');
+      const records = [...new Set(input.ids)].map(id => getRecord(next, 'flightLogs', id));
+      let updated = 0;
+      for (const record of records) {
+        if (record.airdataStatus !== 'uploaded') { record.airdataStatus = 'uploaded'; updated++; }
+        validateFlightLog(next, record);
+      }
+      return { value: { selected: records.length, updated, alreadyUploaded: records.length - updated } };
+    }),
     updateFlightLog: (id, input) => mutate(next => {
       objectInput(input, ['airdataStatus', 'aircraftId', 'rememberAircraft']);
       const record = getRecord(next, 'flightLogs', id);

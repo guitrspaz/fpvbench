@@ -18,6 +18,18 @@ Credentials remain in an owner-private server file, not in browser storage or co
 
 This version sends recognized DJI TXT, timestamped MAVLink TLog, ArduPilot DataFlash, and PX4 ULog originals. Recognition permits a submission attempt; AirData still determines whether it can process the particular file. Decoded DJI JSON, arbitrary JSON/RID captures, Blackbox, CSV, GPX and KML are retained locally and skipped by the uploader.
 
+## Mark uploads made elsewhere
+
+Use manual marks for records you have already uploaded through AirData or another app. No AirData connection or API key is needed.
+
+1. Open **Flight log library** and choose the aircraft scope and AirData status filter you want. Leave **All aircraft** and **All AirData statuses** to include the full library.
+2. Choose **Select all matching**, or check individual records. The selected count shows how many will be marked. Changing either filter clears the selection; **Clear selection** also lets you start over.
+3. Choose **Mark selected as uploaded**. This records your manual upload status without sending files or asking AirData to verify them.
+
+Manual marking supports selections larger than twenty; selections over 1,000 are saved in batches. Each batch saves together. If a later batch fails, earlier successful batches remain marked and the result reports the saved count. Sending and refreshing AirData submissions still require a configured connection and are limited to twenty selected records at a time.
+
+Aircraft assignments, notes, originals, measurements and existing AirData receipts are preserved. You can change a manual mark in an individual record's **AirData upload tracking** section. In folder review, choose **Refresh saved statuses** to remove manually uploaded records from **AirData to review** without rescanning.
+
 ## Interpret the status
 
 | State | Meaning |
