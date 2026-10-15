@@ -1,3 +1,4 @@
+import { buildNextSessionBrief } from './journal.mjs';
 import { validateTransfer } from './airdata-transfer.mjs';
 import { decodeLog } from './log-import.mjs';
 import { prepareDistanceRepair } from './dji-distance.mjs';
@@ -8,7 +9,7 @@ import { AppError } from './errors.mjs';
 import { parseExport } from './parser.mjs';
 import { summarizeSnapshot } from './compare.mjs';
 import { acquireLock } from './workspace-lock.mjs';
-import { aircraftFields, sessionFields, objectInput, textField, getRecord, validateAircraft, validateSession, validateWorkspace, validateFlightLog, validateFrames } from './workspace-validation.mjs';
+import { aircraftFields, sessionFields, journalInputFields, validateJournalEntry, objectInput, textField, getRecord, validateAircraft, validateSession, validateWorkspace, validateFlightLog, validateFrames } from './workspace-validation.mjs';
 
 const copy = value => structuredClone(value);
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -121,11 +122,17 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
     if (source.format !== 'dji-txt' || !Number.isInteger(source.logVersion) || source.logVersion < 6 || source.logVersion > 14 || !/^1581f[a-z0-9]{11}$/.test(key)) return [];
     return catalog.aircraft.filter(aircraft => identifiers(aircraft).some(value => /^1581f[a-z0-9]{15}$/.test(value) && value.startsWith(key)));
   };
+  const detachJournalSession=(catalog,session)=>{
+    for(const aircraft of catalog.aircraft) if(aircraft.id!==session.aircraftId)
+      for(const entry of aircraft.journalEntries??[]) if(entry.sessionId===session.id) {
+        entry.sessionId=null;entry.updatedAt=timestamp();
+      }
+  };
   const attachSession = (catalog, log) => {
     const existing = catalog.sessions.find(session => session.flightLogId === log.id);
     if (existing) {
       if (existing.aircraftId !== log.aircraftId) Object.assign(existing, { aircraftId: log.aircraftId, snapshotId: null, confirmedSetup: false });
-      validateSession(catalog, existing); return existing;
+      validateSession(catalog, existing); detachJournalSession(catalog,existing); return existing;
     }
     if (log.aircraftId === null || log.summary.startTime === null) return null;
     const session = sessionRecord({ aircraftId: log.aircraftId, flightLogId: log.id, title: `DJI flight ${log.summary.startTime.slice(0, 10)}`, flownAt: log.summary.startTime, durationMinutes: log.summary.durationSeconds === null ? null : log.summary.durationSeconds / 60, location: log.summary.location ?? '' });
@@ -158,6 +165,33 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
       queue = work.catch(() => {});
       return work;
     },
+
+    /** Return only this aircraft's journal; older aircraft have no fabricated entries. */
+    getJournal:aircraftId=>copy(getRecord(state,'aircraft',aircraftId).journalEntries??[]),
+    getBrief:aircraftId=>buildNextSessionBrief(state,aircraftId),
+    createJournalEntry:(aircraftId,input)=>mutate(next=>{
+      objectInput(input,journalInputFields);
+      const aircraft=getRecord(next,'aircraft',aircraftId);
+      if((aircraft.journalEntries??[]).length>=500) throw new AppError('This aircraft already has 500 journal entries.');
+      const time=timestamp();
+      const entry={id:randomUUID(),kind:input.kind,title:input.title,details:input.details??'',occurredAt:input.occurredAt??time,snapshotId:input.snapshotId??null,sessionId:input.sessionId??null,sessionTitle:'',status:input.kind==='next-step'?'open':'recorded',createdAt:time,updatedAt:time,closedAt:null};
+      if(entry.sessionId!==null) entry.sessionTitle=getRecord(next,'sessions',entry.sessionId).title;
+      validateJournalEntry(next,aircraftId,entry);
+      (aircraft.journalEntries??=[]).push(entry);return {value:entry};
+    }),
+    updateJournalEntry:(aircraftId,id,input)=>mutate(next=>{
+      objectInput(input,[...journalInputFields,'status']);
+      const aircraft=getRecord(next,'aircraft',aircraftId),entry=(aircraft.journalEntries??[]).find(e=>e.id===id);
+      if(!entry) throw new AppError('Journal entry was not found.',404);
+      const previousKind=entry.kind,previousStatus=entry.status;
+      Object.assign(entry,input);
+      if(entry.kind!==previousKind&&!Object.hasOwn(input,'status')) entry.status=entry.kind==='next-step'?'open':'recorded';
+      if(Object.hasOwn(input,'sessionId')) entry.sessionTitle=entry.sessionId===null?'':getRecord(next,'sessions',entry.sessionId).title;
+      entry.updatedAt=timestamp();
+      const closed=entry.kind==='next-step'&&['done','set-aside'].includes(entry.status);
+      entry.closedAt=closed?(entry.closedAt&&previousStatus===entry.status?entry.closedAt:entry.updatedAt):null;
+      validateJournalEntry(next,aircraftId,entry);return {value:entry};
+    }),
     createAircraft: input => mutate(next => {
       objectInput(input, aircraftFields.filter(field => field !== 'baselineSnapshotId'));
       const record = { id: randomUUID(), name: input.name, status: input.status === undefined ? 'active' : input.status, kind: input.kind ?? '', registrationId: input.registrationId === undefined ? '' : input.registrationId, serialNumber: input.serialNumber === undefined ? '' : input.serialNumber, flightRecordSerials: input.flightRecordSerials === undefined ? [] : input.flightRecordSerials, notes: input.notes ?? '', baselineSnapshotId: null, createdAt: timestamp() };
@@ -182,7 +216,7 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
     }),
     updateSession: (id, input) => mutate(next => {
       objectInput(input, sessionFields); const record = getRecord(next, 'sessions', id);
-      Object.assign(record, input); validateSession(next, record); return { value: record };
+      Object.assign(record, input); validateSession(next, record); detachJournalSession(next,record); return { value: record };
     }),
     matchUnassignedFlightLogs: () => mutate(next => {
       let matched = 0;

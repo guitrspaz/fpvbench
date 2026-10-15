@@ -119,3 +119,9 @@ See [validation.md](validation.md) for the broader validation record and [scope-
 The complete run passed 83 checks with no unexpected browser errors. New checks verify missing-key gating, write-only saves without provider calls, explicit verification, native/unknown archives without sessions, selected upload and refresh, confirmed receipt persistence after reload, repeated-send skipping, status filtering and detail rendering, credential-free export and absence of token storage in the browser.
 
 AirData transport and credentials were synthetic: four fake calls covered verification, destination lookup, upload and job polling. Existing AI journeys made seven fake calls. Automated browser checks opened no database and uploaded no personal originals.
+
+## v0.6 aircraft journal and brief — 2026-10-15
+
+The complete synthetic run passed 100 checks with no unexpected browser errors. Seventeen new checks cover empty briefs without AI, all three entry kinds, optional setup/session links, inert text, editing while preserving event timestamps, the overview brief, done/set-aside/reopen, filters, reload, aircraft isolation, retired history, a delayed response after aircraft switching, mobile layout, complete export and no new provider calls.
+
+Desktop and 390-pixel mobile screenshots were inspected. Existing journeys retained seven fake OpenAI requests and four fake AirData requests. No database, personal workspace, actual upload or billed request was used.

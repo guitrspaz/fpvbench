@@ -1003,3 +1003,15 @@ input[type="file"]::file-selector-button {
 .recap-evidence summary { cursor:pointer; color:var(--muted); font-size:12px; }
 .recap-evidence[open] summary { margin-bottom:15px; }
 @media (max-width:480px) { .recap-highlights dd { font-size:18px; } }
+
+.journal-entry { border-top:1px solid var(--line); padding:18px 0; overflow-wrap:anywhere; min-width:0; }
+.journal-entry h3 { margin:10px 0 6px; font-size:15px; }
+.journal-meta,.journal-actions,.journal-links { display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center; }
+.journal-actions { margin-top:10px; }
+.journal-links .text-button,.brief-context .text-button { text-align:left;white-space:normal;overflow-wrap:anywhere; }
+.next-session>.two-col { margin:20px 0; }
+.next-session .journal-entry .notes { font-size:13px; }
+.brief-context { padding:16px 0;border-top:1px solid var(--line);display:grid;gap:10px; }
+.brief-context .proof-note { margin:0; }
+#journal-list { margin-top:15px; }
+#journal-form textarea { resize:vertical; }

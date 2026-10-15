@@ -103,6 +103,10 @@ export function validateAircraft(state, record) {
   }
   textField(record.notes, "notes");
   snapshotRelationship(state, record.id, record.baselineSnapshotId);
+  if(record.journalEntries!==undefined) {
+    if(!Array.isArray(record.journalEntries)||record.journalEntries.length>500) throw new AppError('Use at most 500 journal entries per aircraft.');
+    for(const entry of record.journalEntries) validateJournalEntry(state,record.id,entry);
+  }
 }
 export function validateSession(state, record) {
   snapshotRelationship(state, record.aircraftId, record.snapshotId);
@@ -162,7 +166,7 @@ export function validateWorkspace(state) {
         "record timestamp",
       );
       if (collection === "aircraft") {
-        objectInput(record, ["id", ...aircraftFields, "createdAt"]);
+        objectInput(record, ["id", ...aircraftFields, "createdAt", "journalEntries"]);
         validateAircraft(state, record);
       }
       if (collection === "sessions") {
@@ -201,6 +205,10 @@ export function validateWorkspace(state) {
           throw new Error("Invalid snapshot parsed evidence.");
       }
     }
+  }
+  for(const aircraft of state.aircraft) for(const entry of aircraft.journalEntries??[]) {
+    if(ids.has(entry.id)) throw new Error("Invalid or duplicate journal ID.");
+    ids.add(entry.id);
   }
 }
 
@@ -265,3 +273,26 @@ export function validateFlightLog(state, record) {
   if (state.flightLogs.some(log => log.id !== record.id && log.sha256 === record.sha256)) throw new AppError('Duplicate original flight record.', 409);
 }
 
+
+export const journalInputFields=['kind','title','details','occurredAt','snapshotId','sessionId'];
+const journalFields=['id',...journalInputFields,'sessionTitle','status','createdAt','updatedAt','closedAt'];
+/** Validate a journal entry and its optional same-aircraft evidence links. */
+export function validateJournalEntry(state,aircraftId,entry) {
+  objectInput(entry,journalFields);
+  if(journalFields.some(key=>!Object.hasOwn(entry,key))||!identifier(entry.id)) throw new AppError('Invalid journal entry identity or fields.');
+  if(!['change','observation','next-step'].includes(entry.kind)) throw new AppError('Choose a change, observation or next step.');
+  textField(entry.title,'title',{required:true,max:200});textField(entry.details,'details');textField(entry.sessionTitle,'sessionTitle',{max:200});
+  for(const field of ['occurredAt','createdAt','updatedAt']) isoDate(entry[field],field);
+  if(Date.parse(entry.updatedAt)<Date.parse(entry.createdAt)) throw new AppError('Invalid journal update time.');
+  const closed=entry.kind==='next-step'&&['done','set-aside'].includes(entry.status);
+  if(entry.kind==='next-step'?!['open','done','set-aside'].includes(entry.status):entry.status!=='recorded') throw new AppError('Choose a valid journal status.');
+  if(closed) {
+    isoDate(entry.closedAt,'closedAt');
+    if(Date.parse(entry.closedAt)<Date.parse(entry.createdAt)||Date.parse(entry.closedAt)>Date.parse(entry.updatedAt)) throw new AppError('Invalid journal close time.');
+  } else if(entry.closedAt!==null) throw new AppError('Only closed next steps have a close time.');
+  snapshotRelationship(state,aircraftId,entry.snapshotId);
+  if(entry.sessionId!==null) {
+    const session=getRecord(state,'sessions',entry.sessionId);
+    if(session.aircraftId!==aircraftId||!entry.sessionTitle.trim()) throw new AppError('Choose a flight session for this aircraft.');
+  }
+}

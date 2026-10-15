@@ -23,11 +23,19 @@ node dev/verify-import.mjs
 node dev/verify-ai.mjs
 node dev/verify-distance.mjs
 node dev/verify-log-intake-airdata.mjs
+node dev/verify-journal.mjs
 ```
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.5.0 results — 2026-10-14
+## Observed v0.6.0 results — 2026-10-15
+
+- 175 Jest tests passed across eighteen suites; ESLint passed. Journal checks cover entry creation/editing, lifecycle, strict fields and references, global IDs, limits, atomic failure, older records, export validation, retirement and session/flight reassignment.
+- The complete synthetic browser run passed 100 checks, including all journal types, optional links, inert text, editing without changing event timestamps, the overview brief, completion/set-aside/reopening, filters, reload, aircraft isolation, late-response handling, retired history, mobile layout and complete export.
+- Journal operations added no provider requests. Existing regression journeys made seven fake OpenAI calls and four fake AirData calls. Automated tests used memory repositories and opened no database.
+- The separate disposable SQLite proof passed retained journal lifecycle, restart, complete restore and older-backup compatibility, with unchanged source setups, session observations, originals, telemetry and upload receipt. No personal records or real provider requests were used.
+
+## Historical v0.5.0 results — 2026-10-14
 
 - 161 Jest tests passed across sixteen suites; ESLint passed. Added coverage includes archive recognition, malformed inputs, exact originals/dedupe, assignment, AI exclusion, receipt validation, write-only credentials, verification, trusted destinations, interrupted submissions, serialized duplicate requests, account separation and retained statuses.
 - 83 browser checks passed with synthetic records and a memory repository, including archive intake without sessions, explicit connection gating, selected sending, refresh, persisted receipts and credential-free exports. Four fake AirData and seven fake OpenAI requests; zero unexpected browser errors.

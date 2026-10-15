@@ -34,6 +34,12 @@ IDs, assignments, sessions, notes, AirData status, other flight records, and ori
 
 Catalog/SQLite version 3 now accepts archive-only formats and an optional AirData transfer payload on each log. No table migration is required. Existing records, identifiers, measurements, notes, original bytes and manual statuses are unchanged. Older complete backups remain valid; older app versions reject new formats/receipt fields rather than silently interpreting them.
 
+## Aircraft journals in v0.6
+
+An optional `journalEntries` array is retained inside each aircraft's existing SQLite JSON payload. No table migration or opening-time rewrite is needed. Complete exports include all entry text, links, lifecycle state and audit timestamps; older backups without entries remain valid. Older app versions reject the new aircraft field, so preserve the pre-update workspace and matching originals before downgrading.
+
+Journal saves do not alter setup exports, imported measurements, original files, session observations or upload receipts. A session reassignment removes old journal session links while retaining their captured titles. The full workspace backup includes journal notes and should remain private.
+
 ## Complete export
 
 Use **Export workspace** in the interface. Version 3 JSON contains:
@@ -86,3 +92,5 @@ To preserve local AI history and settings, copy the whole data directory while t
 `node dev/verify-sqlite.mjs` runs an operational proof against disposable temporary data. It checks actual SQLite persistence/migration and backup/restore separately from automated checks, which use a memory repository. It does not operate on the normal personal workspace.
 
 `node dev/verify-log-intake-airdata.mjs` separately verifies archive and receipt persistence, original bytes, observations, restart dedupe and complete restore using disposable SQLite and a fake AirData transport.
+
+`node dev/verify-journal.mjs` separately verifies actual disposable SQLite journal persistence, lifecycle, restart, complete restore, older-backup compatibility and unchanged original/setup/session/upload evidence.

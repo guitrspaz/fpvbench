@@ -22,6 +22,8 @@ let originalFileText = null;
 let noticeTimer;
 let aiSettings = { available: false };
 let airdataSettings = { available: false };
+let journalFilter="all";
+let journalEditing=null;
 
 function element(tag, attributes = {}, ...children) {
   const node = document.createElement(tag);
@@ -213,6 +215,7 @@ const viewCopy = {
     "Flight sessions",
     "Connect your setup to conditions, observations, and results.",
   ],
+  journal: ["AIRCRAFT MEMORY", "Aircraft journal", "Remember what changed, what you noticed, and what to try next."],
   flights: ["FROM YOUR FLIGHT RECORDS", "Flight log library", "Original files, sourced flight details, and available local telemetry."],
   settings: ["OPTIONAL ASSISTANCE", "Settings", "Keep the workbench offline, or enable an optional OpenAI assistant."],
 };
@@ -244,6 +247,7 @@ async function render() {
   }
   if (currentView === "compare") showCompare(revision);
   if (currentView === "sessions") showSessions();
+  if (currentView === "journal") showJournal();
   if (currentView === "flights") {
     if (flightDetailId && (state.flightLogs || []).some(item => item.id === flightDetailId)) await showFlightDetail(flightDetailId, revision);
     else showFlightLogs();
@@ -403,11 +407,122 @@ function showOverview() {
     );
   content.replaceChildren(
     stats,
+    nextSessionPanel(renderRevision,aircraftId),
     aircraftPanel,
     element("div", { class: "two-col" }, historyPanel, baselinePanel),
     flightPanel,
   );
   if (aiSettings.available) content.append(recapPanel(renderRevision));
+}
+
+
+const journalKindLabel = kind => ({change:"Change",observation:"Observation","next-step":"Next step"})[kind];
+const journalStatusLabel = status => ({recorded:"Recorded",open:"Open",done:"Done","set-aside":"Set aside"})[status];
+
+function journalLinks(entry) {
+  const links=element("div",{class:"journal-links"});
+  const snapshot=snapshots().find(item=>item.id===entry.snapshotId);
+  const session=sessions().find(item=>item.id===entry.sessionId);
+  if(snapshot) links.append(button(`Setup: ${snapshot.label}`,()=>viewSnapshot(snapshot.id),"text-button"));
+  if(session) links.append(button(`Session: ${session.title}`,()=>openSession(session),"text-button"));
+  else if(entry.sessionTitle) links.append(element("p",{class:"item-meta",text:`Previously linked session: ${entry.sessionTitle} (moved to another aircraft)`}));
+  return links;
+}
+
+function journalCard(entry,ownerId) {
+  const actions=element("div",{class:"journal-actions"},button("Edit",()=>openJournal(entry),"text-button"));
+  if(entry.kind==="next-step") {
+    for(const [status,label] of entry.status==="open"?[["done","Mark done"],["set-aside","Set aside"]]:[["open","Reopen"]]) {
+      const control=button(label,async()=>{
+        control.disabled=true;
+        try {
+          await api(`/api/aircraft/${encodeURIComponent(ownerId)}/journal/${encodeURIComponent(entry.id)}`,{status},"PATCH");
+          await refresh();notify(status==="open"?"Next step reopened.":"Next step updated; its history is retained.");
+        } catch(error) {notify(error.message,true);control.disabled=false;}
+      },"text-button");
+      actions.append(control);
+    }
+  }
+  return element("article",{class:"journal-entry","data-entry-id":entry.id},
+    element("div",{class:"journal-meta"},badge(journalKindLabel(entry.kind)),entry.kind==="next-step"?badge(journalStatusLabel(entry.status),entry.status==="open"?"amber":""):null),
+    element("h3",{text:entry.title}),
+    element("p",{class:"item-meta",text:date(entry.occurredAt,true)}),
+    entry.details?element("p",{class:"notes",text:entry.details}):null,
+    journalLinks(entry),actions);
+}
+
+function openJournal(entry=null,kind="change") {
+  if(!aircraftId)return;
+  journalEditing={aircraftId,entryId:entry?.id??null};
+  const form=$("#journal-form");form.reset();
+  $("#journal-dialog-title").textContent=entry?"Edit journal entry":"Add journal entry";
+  for(const key of ["kind","title","details","status"]) form.elements[key].value=entry?.[key]??({kind,status:"open",title:"",details:""}[key]);
+  form.elements.occurredAt.value=localDateTime(entry?.occurredAt??new Date());
+  journalEditing.originalOccurredAt=entry?.occurredAt??new Date().toISOString();journalEditing.displayOccurredAt=form.elements.occurredAt.value;
+  for(const [field,items,label,optionText] of [
+    ["snapshotId",snapshots(),"No linked setup",item=>item.label],
+    ["sessionId",sessions(),"No linked session",item=>item.title],
+  ]) {
+    form.elements[field].replaceChildren(element("option",{value:"",text:label}),...items.map(item=>element("option",{value:item.id,text:optionText(item)})));
+    form.elements[field].value=entry?.[field]??"";
+  }
+  updateJournalStatusField();openDialog("journal");
+}
+
+function updateJournalStatusField() {
+  const form=$("#journal-form"),isNext=form.elements.kind.value==="next-step";
+  $("#journal-status-field").hidden=!isNext||!journalEditing?.entryId;
+  if(!["open","done","set-aside"].includes(form.elements.status.value))form.elements.status.value="open";
+}
+
+function showJournal() {
+  const ownerId=aircraftId,entries=[...(selectedAircraft().journalEntries??[])].sort((a,b)=>Date.parse(b.occurredAt)-Date.parse(a.occurredAt)||a.id.localeCompare(b.id));
+  const filter=element("select",{"aria-label":"Filter journal entries"});
+  for(const [value,text] of [["all","All entries"],["open","Open next steps"],["change","Changes"],["observation","Observations"],["closed","Done or set aside"]])filter.append(element("option",{value,text}));
+  filter.value=journalFilter;
+  const list=element("div",{id:"journal-list"});
+  const draw=()=>{
+    journalFilter=filter.value;
+    const chosen=entries.filter(e=>journalFilter==="all"||(journalFilter==="open"?e.kind==="next-step"&&e.status==="open":journalFilter==="closed"?e.kind==="next-step"&&e.status!=="open":e.kind===journalFilter));
+    list.replaceChildren(...chosen.map(entry=>journalCard(entry,ownerId)));
+    if(!chosen.length)list.append(element("p",{class:"muted",text:entries.length?"No entries match this filter.":"No journal entries yet. Record a change, an observation, or something to try next."}));
+  };
+  filter.addEventListener("change",draw);draw();
+  content.replaceChildren(element("section",{class:"panel"},panelHeading("Aircraft journal","Changes, observations, and next steps stay with this aircraft.",button("+ Add entry",()=>openJournal(),"primary")),element("div",{class:"toolbar"},filter),list));
+}
+
+function nextSessionPanel(revision,ownerId) {
+  const panel=element("section",{class:"panel next-session",id:"next-session-brief"},
+    panelHeading("Next session","Pick up where you left off.",button("+ Add next step",()=>openJournal(null,"next-step"),"text-button")),
+    element("p",{class:"loading",text:"Loading this aircraft’s brief…"}));
+  api(`/api/aircraft/${encodeURIComponent(ownerId)}/brief`).then(brief=>{
+    if(revision!==renderRevision||aircraftId!==ownerId)return;
+    $(".loading",panel)?.remove();
+    const steps=element("div",{class:"brief-steps"},element("h3",{text:`Open next steps (${brief.openNextStepCount})`}));
+    steps.append(...brief.openNextSteps.map(entry=>journalCard(entry,ownerId)));
+    if(!brief.openNextStepCount)steps.append(element("p",{class:"muted",text:"No open next steps. Add something you want to remember for the next session."}));
+    if(brief.openNextStepCount>brief.openNextSteps.length)steps.append(element("p",{class:"item-meta",text:`${brief.openNextStepCount-brief.openNextSteps.length} more in the journal.`}));
+    const recent=element("div",{},element("h3",{text:"Recent changes and observations"}));
+    recent.append(...brief.recentEntries.map(entry=>journalCard(entry,ownerId)));
+    if(!brief.recentEntries.length)recent.append(element("p",{class:"muted",text:"No changes or observations recorded yet."}));
+    panel.append(element("div",{class:"two-col"},steps,recent));
+    const context=element("div",{class:"brief-context"});
+    if(brief.latestSession) {
+      const session=sessions().find(item=>item.id===brief.latestSession.id);
+      context.append(button(`Last recorded session: ${brief.latestSession.title} · ${date(brief.latestSession.flownAt)}`,()=>openSession(session),"text-button"));
+    } else context.append(element("p",{class:"item-meta",text:"No flight session recorded for this aircraft."}));
+    if(brief.latestSnapshot) {
+      context.append(button(`Latest saved setup: ${brief.latestSnapshot.label}`,()=>viewSnapshot(brief.latestSnapshot.id),"text-button"),
+        element("p",{class:"proof-note",text:brief.latestSnapshot.confirmedInSession?"A recorded session confirms using this snapshot. This does not confirm the aircraft’s current settings.":"No recorded session confirms using this snapshot. Current aircraft settings are not known."}));
+    } else context.append(element("p",{class:"item-meta",text:"No saved setup for this aircraft."}));
+    if(brief.baseline)context.append(element("p",{class:"item-meta",text:`Preferred baseline: ${brief.baseline.label}`}));
+    panel.append(context,button("Open aircraft journal →",()=>navigate("journal"),"text-button"));
+  }).catch(error=>{
+    if(revision===renderRevision&&aircraftId===ownerId) {
+      $(".loading",panel)?.remove();panel.append(element("p",{class:"form-error",text:error.message}));
+    }
+  });
+  return panel;
 }
 
 function snapshotRow(snapshot) {
@@ -1838,6 +1953,21 @@ submitForm("session-form", async (form) => {
   notify(
     editingSessionId ? "Flight session updated." : "Flight session saved.",
   );
+});
+
+
+$("#journal-form").elements.kind.addEventListener("change",updateJournalStatusField);
+submitForm("journal-form",async(form)=>{
+  const target={...journalEditing};
+  if(target.aircraftId!==aircraftId)throw new Error("The selected aircraft changed. Close this form and reopen its journal.");
+  const payload={
+    kind:form.elements.kind.value,title:form.elements.title.value,details:form.elements.details.value,
+    occurredAt:target.originalOccurredAt&&form.elements.occurredAt.value===target.displayOccurredAt?target.originalOccurredAt:new Date(form.elements.occurredAt.value).toISOString(),snapshotId:form.elements.snapshotId.value||null,sessionId:form.elements.sessionId.value||null,
+  };
+  if(target.entryId&&payload.kind==="next-step")payload.status=form.elements.status.value;
+  await api(`/api/aircraft/${encodeURIComponent(target.aircraftId)}/journal${target.entryId?"/"+encodeURIComponent(target.entryId):""}`,payload,target.entryId?"PATCH":"POST");
+  if(aircraftId===target.aircraftId){currentView="journal";journalFilter="all";}
+  notify("Journal entry saved.");
 });
 
 refresh().catch((error) => {

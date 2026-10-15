@@ -1,0 +1,43 @@
+import { test,expect,beforeEach,afterEach } from '@jest/globals';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {createServer} from '../src/server.mjs';
+import {createStore} from '../src/store.mjs';
+import {createMemoryRepository} from './helpers/memory-repository.mjs';
+let server,dir,base,aircraft;
+const request=(path,input,method='POST',headers={})=>fetch(base+path,{method,headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(input)});
+beforeEach(async()=>{
+  dir=await mkdtemp(join(tmpdir(),'fpvbench-journal-api-'));
+  server=await createServer({dataDir:dir,storeFactory:directory=>createStore(directory,{repositoryFactory:createMemoryRepository})});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  base='http://127.0.0.1:'+server.address().port;
+  aircraft=await(await request('/api/aircraft',{name:'Synthetic journal quad'})).json();
+});
+afterEach(async()=>{await new Promise(resolve=>server.close(resolve));await rm(dir,{recursive:true,force:true});});
+test('journal and brief routes share saved state, editing lifecycle and complete exports',async()=>{
+  const path='/api/aircraft/'+aircraft.id+'/journal';
+  expect(await(await fetch(base+path)).json()).toEqual([]);
+  const response=await request(path,{kind:'next-step',title:'Try a different rate profile'});
+  expect(response.status).toBe(201);const entry=await response.json();
+  let brief=await(await fetch(base+'/api/aircraft/'+aircraft.id+'/brief')).json();
+  expect(brief.openNextSteps[0].id).toBe(entry.id);
+  expect((await request(path+'/'+entry.id,{status:'done'},'PATCH')).status).toBe(200);
+  brief=await(await fetch(base+'/api/aircraft/'+aircraft.id+'/brief')).json();
+  expect(brief.openNextStepCount).toBe(0);
+  const backup=await(await fetch(base+'/api/export')).json();
+  expect(backup.aircraft[0].journalEntries[0]).toMatchObject({id:entry.id,status:'done'});
+  expect((await request(path+'/'+entry.id,{status:'open'},'PATCH')).status).toBe(200);
+});
+test('bad routes, input, origin and generic aircraft injection are rejected',async()=>{
+  const path='/api/aircraft/'+aircraft.id+'/journal';
+  expect((await request(path,{kind:'next-step',title:''})).status).toBe(400);
+  expect((await request(path,{kind:'next-step',title:'x'},'POST',{Origin:'https://foreign.example'})).status).toBe(403);
+  expect((await request('/api/aircraft/'+aircraft.id,{journalEntries:[]},'PATCH')).status).toBe(400);
+  expect((await fetch(base+'/api/aircraft/'+randomUUID()+'/brief')).status).toBe(404);
+  expect((await request(path+'/'+randomUUID(),{title:'x'},'PATCH')).status).toBe(404);
+  expect((await request('/api/aircraft/'+aircraft.id+'/brief',{})).status).toBe(404);
+  expect((await request(path,{kind:'change',title:'x',details:'x'.repeat(65536)})).status).toBe(413);
+  expect(await(await fetch(base+path)).json()).toEqual([]);
+});

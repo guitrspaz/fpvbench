@@ -170,6 +170,17 @@ export async function createServer({
       const match = path.match(
         /^\/api\/(aircraft|snapshots|sessions|flight-logs)\/([^/]+)(\/(?:raw|frames))?$/,
       );
+      const journalRoute=path.match(/^\/api\/aircraft\/([^/]+)\/(journal|brief)(?:\/([^/]+))?$/);
+      if(journalRoute) {
+        const [,aircraftId,resource,entryId]=journalRoute;
+        if(resource==="brief"&&!entryId&&req.method==="GET") return json(res,200,store.getBrief(aircraftId));
+        if(resource==="journal") {
+          if(!entryId&&req.method==="GET") return json(res,200,store.getJournal(aircraftId));
+          if(!entryId&&req.method==="POST") return json(res,201,await store.createJournalEntry(aircraftId,await body(req,65536)));
+          if(entryId&&req.method==="PATCH") return json(res,200,await store.updateJournalEntry(aircraftId,entryId,await body(req,65536)));
+        }
+        throw new AppError("API route was not found.",404);
+      }
       if (path === "/api/airdata/settings" && req.method === "GET") return json(res, 200, await airdata.getSettings());
       if (path === "/api/airdata/settings" && req.method === "PATCH") return json(res, 200, await airdata.updateSettings(await body(req, 4096)));
       if (path === "/api/airdata/check" && req.method === "POST") { emptyAiBody(await body(req, 1024)); return json(res, 200, await airdata.checkConnection()); }

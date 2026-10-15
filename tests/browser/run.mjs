@@ -1,3 +1,4 @@
+import { runJournalJourney } from './journal-journey.mjs';
 import { browserAirdata, runAirdataJourney } from './airdata-journey.mjs';
 import { mkdtemp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -39,8 +40,9 @@ try {
   const fleet = await runFleetJourney({ page, expect, baseURL });
   const lifecycle = await runStatusJourney({ page, expect, baseURL, baselineText });
   const uploads = await runAirdataJourney({ page, expect, baseURL, airdata });
+  const journal=await runJournalJourney({page,expect,baseURL,baselineText,screenshotDir,provider,airdata});
   expect((await readdir(dataDir)).some(name => name.startsWith('workspace.sqlite'))).toBe(false);
-  console.log(JSON.stringify({ browser: browser.version(), ...result, dji, ai, fleet, lifecycle, uploads, providerCalls: provider.calls.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
+  console.log(JSON.stringify({ browser: browser.version(), ...result, dji, ai, fleet, lifecycle, uploads, journal, providerCalls: provider.calls.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
 } finally {
   if (browser) await browser.close();
   if (server?.listening) await new Promise((resolve) => server.close(resolve));

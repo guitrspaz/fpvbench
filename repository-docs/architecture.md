@@ -2,7 +2,7 @@
 
 ## Local application
 
-FPVBench v0.5 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI and AirData requests use server-side fetch.
+FPVBench v0.6 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI and AirData requests use server-side fetch.
 
 The interface calls JSON endpoints for aircraft, setup imports/comparison, sessions, and flight-log records. Browser local storage remembers aircraft/fleet selection and display units; the server owns the data.
 
@@ -12,6 +12,7 @@ The interface calls JSON endpoints for aircraft, setup imports/comparison, sessi
 | --- | --- |
 | `src/parser.mjs` | Parse inert Betaflight text into profile-aware settings and metadata. |
 | `src/compare.mjs` | Summarize and compare supplied evidence without inventing omitted defaults. |
+| `src/journal.mjs` | Calculate the aircraft-scoped next-session brief from recorded evidence without provider calls. |
 | `src/store.mjs` | Validate relationships, serialize mutations, migrate legacy data, and retain originals. |
 | `src/workspace-validation.mjs` | Validate catalog, sourced summaries, and normalized frames. |
 | `src/workspace-lock.mjs` | Own/recover the data-directory lock. |
@@ -79,3 +80,11 @@ Jest, Playwright, and ESLint are development dependencies. The `@istanbuljs/load
 ## Fleet routing and inbox
 
 Imported flight records can have a null aircraft relationship in catalog/SQLite version 3. Aircraft and sessions still require actual fleet identities. Serial matching uses only aircraft serials and explicit aliases; controller identity, labels and selection do not route mixed imports. Unassigned records retain original/telemetry evidence without a session until assignment. Assignment, alias learning and session creation/update commit together. Explicit batch rematching only changes unassigned records. Reassignment clears the old aircraft’s setup link and confirmation while retaining session observations. Exact-byte dedupe spans all aircraft and the inbox. Existing v2 SQLite is backed up before its transactional nullable-flight relationship migration; complete v2 JSON exports remain restorable.
+
+## Aircraft journal and next-session brief
+
+Aircraft JSON payloads optionally contain up to 500 journal entries; absence means empty. The catalog and SQLite schema remain version 3. Dedicated journal APIs own creation and editing, while ordinary aircraft updates cannot replace the journal. Validation checks entry fields, global ID uniqueness, timestamps, lifecycle states and same-aircraft setup/session links. Serialized writes preserve atomicity.
+
+`GET/POST /api/aircraft/:id/journal` reads/creates entries; `PATCH /api/aircraft/:id/journal/:entryId` edits an entry or changes next-step status. The server owns IDs, creation/update/close timestamps and captured session titles. Session reassignment detaches old-aircraft journal links while retaining captured titles and user text. No entry is moved or automatically generated.
+
+`GET /api/aircraft/:id/brief` computes up to three oldest open next steps, three newest changes/observations, and references to the latest recorded session, latest saved setup and preferred baseline. Ties use entry IDs. Snapshot confirmation derives only from explicitly confirmed session links. The browser guards delayed brief responses against aircraft/view changes. Journal content is excluded from existing AI inputs and needs no provider access. See [the user guide](change-journal.md).

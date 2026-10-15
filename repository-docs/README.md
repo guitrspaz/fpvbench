@@ -5,6 +5,7 @@
 - [Betaflight imports](betaflight-imports.md): prepare exports and interpret their limits.
 - [Flight log imports](dji-flight-imports.md): DJI decoding, broader original archives, assignment, and format limits.
 - [AirData uploads](airdata.md): optional connection, selected original uploads, and processing receipts.
+- [Change journal and next-session brief](change-journal.md): per-aircraft memory, open next steps, and recorded context.
 - [Optional AI](optional-ai.md): setup assistant, recap, API key, allowance, and privacy.
 - [v0.3 scope](scope-v0.3.md): optional OpenAI integration contract.
 - [Storage and backups](storage-and-backups.md): SQLite migration, complete exports, and local restore.

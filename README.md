@@ -14,6 +14,7 @@ Built for FPV pilots with a growing fleet, with a place for DJI photography-dron
 | Understand what changed | Compare settings across snapshots, including PID/rate profiles, with readable changes and missing values marked as unknown. |
 | Sort a pile of flight records | Bulk import copied DJI files, match unique aircraft serials, and keep unknown records in an assignable inbox. |
 | Send originals to AirData | Select supported logs, submit them with an optional configured connection, and keep processing receipts alongside manual upload marks. |
+| Pick up where you left off | Keep an aircraft journal of changes, observations, and next steps; see open items and recent context on Overview. |
 | Connect setups with observations | Record equipment, conditions, notes, results, and footage references in flight sessions; link the setup you used. |
 | Keep your fleet's history | Store registration IDs and serials; retire an aircraft from the active fleet while keeping its records. |
 | Get a quick explanation | Enable optional AI for setup explanations and a flight recap focused on the selected aircraft. |
@@ -25,6 +26,12 @@ Import a Betaflight `dump all` or `diff all` export and give it a name you will 
 After flying, add your observations and link the setup you used. Each aircraft builds a record of settings, experiments, and what you noticed in the air.
 
 A saved snapshot does not confirm the aircraft's current settings. Setup confirmation is explicit, and FPVBench does not apply configurations to a controller. [Betaflight import guide →](repository-docs/betaflight-imports.md)
+
+## Pick up where you left off
+
+Record a change, an observation, or a next step in each aircraft's journal. Link entries to saved setups or flight sessions when useful. The next-session brief on Overview brings back open next steps, recent entries, and the latest recorded session and saved setup.
+
+Mark a next step done, set it aside, or reopen it without losing its history. The journal and brief work without AI and keep their text local. [Change journal and next-session brief →](repository-docs/change-journal.md)
 
 ## Organize a mixed fleet's flight records
 
