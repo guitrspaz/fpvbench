@@ -30,7 +30,13 @@ node dev/verify-bulk-airdata.mjs
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.7.1 results — 2026-10-15
+## Observed v0.7.2 results — 2026-10-15
+
+- ESLint and all 197 Jest tests passed across twenty-two suites. The full synthetic browser run passed 135 checks.
+- The Not uploaded filter now includes unmarked defaults and explicit not-uploaded marks. Browser checks verify default labels, mixed-default/marked bulk selection, exclusion of current processing/confirmed submissions and removal after manual marking. Existing receipt and failure paths remain covered.
+- This revision changes interface labels and filtering only. Saved manual fields, receipts, imports and catalog format remain unchanged; no new migration or persistence proof was needed. Automated checks opened no database and used no personal records or real providers. Regression provider totals remained seven fake OpenAI and four fake AirData calls.
+
+## Historical v0.7.1 results — 2026-10-15
 
 - ESLint and all 197 Jest tests passed across twenty-two suites. Added store/API checks cover atomic manual marking, strict bounded inputs, missing IDs, persistence failure, dedupe/idempotence, concurrent assignment, retained evidence/receipts, credential-free operation and folder review updates without rescanning.
 - The complete synthetic browser run passed 133 checks. New checks verify filtered selection, count/clear behavior, marking twenty-five logs with no AirData key, preservation of all other exported evidence and receipts, reload, folder queue updates, failure reporting and mobile layout.

@@ -40,14 +40,25 @@ export async function runAirdataJourney({ page, expect, baseURL, airdata }) {
   const imported = await readState();
   expect(imported.sessions).toEqual(before.sessions);
   expect(imported.flightLogs.filter(log => log.status === 'archived')).toHaveLength(2);
+  await page.getByLabel('Filter AirData upload status').selectOption('not-uploaded');
+  const defaultRow=page.locator('.item-row').filter({has:page.getByRole('button',{name:'synthetic-native.ulg',exact:true})});
+  await expect(defaultRow.getByText('AirData: Not uploaded (default)',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'synthetic-remote.ridlog',exact:true})).toBeVisible();
   await page.getByLabel('Select synthetic-native.ulg', { exact: true }).check();
   await page.getByRole('button', { name: 'Send selected logs to AirData', exact: true }).click();
   await expect(page.getByText('AirData: Processing', { exact: true })).toBeVisible();
   expect(airdata.calls).toHaveLength(3);
+  await page.getByLabel('Filter AirData upload status').selectOption('not-uploaded');
+  await expect(page.getByRole('button',{name:'synthetic-native.ulg',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'synthetic-remote.ridlog',exact:true})).toBeVisible();
+  await page.getByLabel('Filter AirData upload status').selectOption('');
   await page.getByLabel('Select synthetic-native.ulg', { exact: true }).check();
   await page.getByRole('button', { name: 'Refresh selected AirData status', exact: true }).click();
   await expect(page.getByText('AirData: Confirmed by AirData', { exact: true })).toBeVisible();
   expect(airdata.calls).toHaveLength(4);
+  await page.getByLabel('Filter AirData upload status').selectOption('not-uploaded');
+  await expect(page.getByRole('button',{name:'synthetic-native.ulg',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'synthetic-remote.ridlog',exact:true})).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: 'Flight log library', exact: true }).click();
   await expect(page.getByText('AirData: Confirmed by AirData', { exact: true })).toBeVisible();
@@ -65,5 +76,5 @@ export async function runAirdataJourney({ page, expect, baseURL, airdata }) {
   expect(exported).not.toContain('HDTEST0001');
   expect(exported).not.toContain('TESTKEY1');
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain('HDTEST0001');
-  return { passed: ['write-only AirData settings', 'no call on save', 'explicit verification', 'native and unknown archives', 'archives create no flights', 'explicit original upload', 'processing and confirmed receipts', 'reload receipt', 'dedupe submission', 'provider-state filter', 'private credentials excluded from export/browser storage'], providerCalls: airdata.calls.length };
+  return { passed: ['write-only AirData settings', 'no call on save', 'explicit verification', 'native and unknown archives', 'archives create no flights', 'unmarked defaults join not-uploaded queue','processing and confirmed excluded from not-uploaded queue', 'explicit original upload', 'processing and confirmed receipts', 'reload receipt', 'dedupe submission', 'provider-state filter', 'private credentials excluded from export/browser storage'], providerCalls: airdata.calls.length };
 }

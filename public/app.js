@@ -1435,14 +1435,14 @@ function flightStatus(log) {
   return badge(log.status === "archived" ? "ARCHIVED ORIGINAL" : log.status === "decoded" ? "DECODED" : "SUMMARY ONLY", log.status === "decoded" ? "green" : "amber");
 }
 
-const airdataLabels = { unknown: "Not recorded", "not-uploaded": "Not uploaded", uploaded: "Uploaded" };
+const airdataLabels = { unknown: "Not uploaded (default)", "not-uploaded": "Not uploaded (marked)", uploaded: "Uploaded" };
 
 function transferFor(log) { return log.airdataTransfer?.accountId === airdataSettings.accountId ? log.airdataTransfer : null; }
 function uploadState(log) {
   const receipt = transferFor(log);
   return receipt ? (receipt.status === "submitting" ? "unknown" : receipt.status === "preparing" ? "error" : receipt.status) : log.airdataStatus === "uploaded" ? "manual-sent" : log.airdataStatus === "not-uploaded" ? "needs-send" : "unconfirmed";
 }
-const transferLabels = { success: "Confirmed by AirData", pending: "Processing", running: "Processing", unknown: "Submission outcome unknown", error: "Upload failed", "manual-sent": "Manually marked sent", "needs-send": "Marked needs sending", unconfirmed: "Not confirmed" };
+const transferLabels = { success: "Confirmed by AirData", pending: "Processing", running: "Processing", unknown: "Submission outcome unknown", error: "Upload failed", "manual-sent": "Manually marked sent", "needs-send": "Marked needs sending", unconfirmed: "Not uploaded (default)" };
 function airdataBadge(log) {
   const receipt = transferFor(log);
   if (receipt) return badge("AirData: " + transferLabels[uploadState(log)], receipt.status === "success" ? "green" : "amber");
@@ -1473,7 +1473,7 @@ async function showFiling(revision) {
     const status=element("p",{role:"status","aria-live":"polite",class:"filing-progress"});
     const results=element("section",{class:"panel filing-results",id:"filing-review"});
     const filter=element("select",{"aria-label":"Filter folder review"});
-    for(const [value,text] of [["all","All reviewed files"],["new","New originals"],["imported","Already imported"],["duplicates","Extra copies"],["unassigned","Unassigned imports"],["airdata","AirData to review"],["needs-send","Marked needs sending"],["unconfirmed","Not confirmed in AirData"],["processing","Processing in AirData"],["confirmed","Confirmed or manually marked sent"],["uncertain","Submission outcome unknown"],["blocked","Blocked files"]])filter.append(element("option",{value,text}));
+    for(const [value,text] of [["all","All reviewed files"],["new","New originals"],["imported","Already imported"],["duplicates","Extra copies"],["unassigned","Unassigned imports"],["airdata","AirData to review"],["needs-send","Marked needs sending"],["unconfirmed","Not uploaded (default)"],["processing","Processing in AirData"],["confirmed","Confirmed or manually marked sent"],["uncertain","Submission outcome unknown"],["blocked","Blocked files"]])filter.append(element("option",{value,text}));
     filter.value=filingFilter;
     const source=element("input",{type:"text",name:"sourceDevice",maxlength:"200",placeholder:"Optional; does not determine the aircraft"});
     const importButton=button("Import selected files",async()=>{
@@ -1512,7 +1512,7 @@ async function showFiling(revision) {
     const controls=element("div",{class:"toolbar filing-controls"},filter,selectNew,clear,refreshReview);
     results.append(panelHeading("Folder review","Counts apply to this folder snapshot. Import and assignment statuses are read from the current library."),
       summary,counts,controls,element("label",{},"Source device (optional)",source),element("div",{class:"toolbar"},importButton,selection),status,rows,pager,history,
-      element("p",{class:"proof-note",text:"AirData to review includes eligible imports marked needs sending, failed, or not confirmed. Not confirmed does not mean the file is missing from AirData. Pending, confirmed, and uncertain submissions are not queued for another send."}),
+      element("p",{class:"proof-note",text:"Unmarked imports default to Not uploaded. AirData to review includes eligible defaults, records marked needs sending, and failed uploads. This is an upload to-do list; records may already exist in AirData. Pending, confirmed, and uncertain submissions are kept separate."}),
       button("Open flight log library →",()=>navigate("flights"),"text-button"));
     function filtered() {
       return (report?.files??[]).filter(file=>{
@@ -1614,14 +1614,15 @@ function showFlightLogs() {
   scope.addEventListener("change", () => { flightScope = scope.value; showFlightLogs(); });
   const filter = element("select", { "aria-label": "Filter AirData upload status", id: "airdata-status-filter" },
     element("option", { value: "", text: "All AirData statuses" }),
-    ...Object.entries(airdataLabels).map(([value, text]) => element("option", { value, text })),
+    element("option", { value: "not-uploaded", text: "Not uploaded" }),
+    element("option", { value: "uploaded", text: "Uploaded" }),
     ...["success", "pending", "manual-sent", "needs-send", "unconfirmed", "error", "unknown-transfer"].map(value => element("option", { value: "transfer:" + value, text: value === "unknown-transfer" ? "Submission outcome unknown" : transferLabels[value] })));
   const chosen = new Set();
   let working = false;
   const selection = element("p", { class: "result-count", "aria-live": "polite" });
   const rows = element("div");
   const count = element("p", { class: "result-count" });
-  const matching = () => logs.filter(log => !filter.value || (filter.value.startsWith("transfer:") ? uploadState(log) === filter.value.slice(9).replace("unknown-transfer", "unknown") || (filter.value === "transfer:pending" && uploadState(log) === "running") : (log.airdataStatus || "unknown") === filter.value));
+  const matching = () => logs.filter(log => !filter.value || (filter.value === "not-uploaded" ? log.airdataStatus !== "uploaded" && ["unconfirmed", "needs-send", "error"].includes(uploadState(log)) : filter.value.startsWith("transfer:") ? uploadState(log) === filter.value.slice(9).replace("unknown-transfer", "unknown") || (filter.value === "transfer:pending" && uploadState(log) === "running") : log.airdataStatus === filter.value));
   const updateSelection = () => {
     selection.textContent = `${chosen.size} selected`;
     mark.disabled = working || !chosen.size;
@@ -1684,6 +1685,7 @@ function showFlightLogs() {
     update();
   }
   panel.append(element("div", { class: "toolbar" }, scope, filter, match), element("div", { class: "toolbar" }, selectAll, clear, mark, selection),
+    element("p", { class: "form-help", text: "Unmarked logs default to Not uploaded. This upload to-do list includes unmarked, marked not uploaded, and failed records; processing, confirmed and uncertain submissions stay separate. Records may already exist in AirData." }),
     element("p", { class: "form-help", text: "Select all matching uses the current aircraft and AirData filters. Manual marks record uploads you already made; no files are sent or verified." }),
     element("div", { class: "toolbar" }, send, check),
     element("p", { class: "form-help", text: "Sending or refreshing submissions is limited to 20 selected logs at a time. Manual marking can cover all matching logs." }),

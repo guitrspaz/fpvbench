@@ -20,6 +20,7 @@ export async function runBulkAirdataJourney({page,expect,baseURL,folder,screensh
     created.push(imported.flightLog);await writeFile(join(folder,filename),bytes);
   }
   await request('/api/flight-logs/'+created[0].id,{airdataStatus:'uploaded'},'PATCH');
+  await request('/api/flight-logs/'+created[1].id,{airdataStatus:'not-uploaded'},'PATCH');
   // Keep the connection identity/receipt, but remove the developer key to prove offline availability.
   await request('/api/airdata/settings',{appKey:null},'PATCH');
   const scan=await request('/api/filing/scan',{});
@@ -30,7 +31,7 @@ export async function runBulkAirdataJourney({page,expect,baseURL,folder,screensh
   await page.getByLabel('Filter aircraft assignment').selectOption('selected');
   await page.getByRole('button',{name:'Select all matching',exact:true}).click();
   await expect(page.getByText('27 selected',{exact:true})).toBeVisible();
-  await page.getByLabel('Filter AirData upload status').selectOption('transfer:unconfirmed');
+  await page.getByLabel('Filter AirData upload status').selectOption('not-uploaded');
   await expect(page.getByText('0 selected',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Mark selected as uploaded',exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'Select all matching',exact:true}).click();

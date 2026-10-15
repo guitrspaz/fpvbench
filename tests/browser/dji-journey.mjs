@@ -101,7 +101,7 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   await content.getByLabel('Filter AirData upload status', { exact: true }).selectOption('uploaded');
   await expect(content.getByRole('button', { name: 'decoded-smoke.json', exact: true })).toBeVisible();
   await expect(content.getByRole('button', { name: 'summary-smoke.json', exact: true })).toHaveCount(0);
-  await content.getByLabel('Filter AirData upload status', { exact: true }).selectOption('unknown');
+  await content.getByLabel('Filter AirData upload status', { exact: true }).selectOption('not-uploaded');
   await expect(content.getByRole('button', { name: 'summary-smoke.json', exact: true })).toBeVisible();
   await expect(content.getByRole('button', { name: 'decoded-smoke.json', exact: true })).toHaveCount(0);
   await content.getByLabel('Filter AirData upload status', { exact: true }).selectOption('');

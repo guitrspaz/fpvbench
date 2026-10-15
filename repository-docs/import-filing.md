@@ -29,7 +29,7 @@ Aircraft serials and remembered aliases route unique matches automatically. Shar
 
 ## AirData follow-up
 
-**Not confirmed** means FPVBench has no confirmation for the current connection; the file may already be in AirData through another route. Use manual marks for uploads made elsewhere. A manual sent mark removes the record from the review queue.
+Unmarked imports default to **Not uploaded (default)** and join the upload to-do list. A file may already be in AirData through another route; this default does not query your account's history. Use manual marks for uploads made elsewhere. A manual sent mark removes the record from the review queue.
 
 To mark a group, return to **Flight log library**, set the aircraft and AirData filters, choose **Select all matching**, then **Mark selected as uploaded**. Return here and choose **Refresh saved statuses**. These manual marks need no AirData key and send no files. See [bulk marking](airdata.md#mark-uploads-made-elsewhere).
 

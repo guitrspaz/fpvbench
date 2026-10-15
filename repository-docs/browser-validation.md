@@ -22,7 +22,13 @@ FPVBENCH_SCREENSHOT_DIR=/absolute/local/screenshot-directory npm run test:browse
 
 The runner also accepts --screenshot-dir=/absolute/local/directory as a command-line argument. Screenshots contain synthetic test data and are not added to the repository automatically.
 
-## Observed result — v0.7.1, 2026-10-15
+## Observed result — v0.7.2, 2026-10-15
+
+The complete synthetic run passed 135 checks. New assertions verify that unmarked originals appear as **Not uploaded (default)** in the primary **Not uploaded** filter, while processing and confirmed submissions are excluded. The bulk-marking journey now selects a mixture of defaults and explicit not-uploaded marks, preserves other evidence, and removes marked records from the review queue.
+
+The change added no provider requests. Existing fake-provider totals stayed at seven OpenAI and four AirData calls. All automated data remained synthetic and used a memory repository; no database or personal workspace was accessed.
+
+## Historical result — v0.7.1, 2026-10-15
 
 The complete synthetic run passed 133 checks with no unexpected page exceptions. Ten new bulk-marking checks cover selection across the current aircraft/status filters, selected count and clearing, more than twenty logs marked with the AirData key absent, preserved evidence and receipts, folder queue refresh without rescanning, reload, failed-request reporting, mobile overflow and no new provider calls.
 

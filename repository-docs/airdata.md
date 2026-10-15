@@ -32,6 +32,8 @@ Aircraft assignments, notes, originals, measurements and existing AirData receip
 
 ## Interpret the status
 
+Unmarked records default to **Not uploaded** in the library's upload to-do list. That filter includes defaults, explicit not-uploaded marks and failed uploads. It excludes manually uploaded records and current-connection submissions that are processing, confirmed or uncertain. The **Not uploaded (default)** label identifies an unmarked record; it may already be in AirData through another route. Mark it uploaded after your upload or account check.
+
 | State | Meaning |
 | --- | --- |
 | Confirmed by AirData | AirData reported successful processing of this submission. |
@@ -40,7 +42,8 @@ Aircraft assignments, notes, originals, measurements and existing AirData receip
 | Upload failed | Preparation failed or AirData reported a processing error. |
 | Manually marked sent | Your own record of an upload performed elsewhere. |
 | Marked needs sending | Your own record that the file still needs uploading. |
-| Not confirmed | There is no current-token receipt or manual sent mark. |
+| Not uploaded (default) | An unmarked record treated as an upload to-do. No historical AirData lookup has been performed. |
+| Not uploaded (marked) | Your explicit record that the file needs uploading. |
 
 Manual statuses remain separate from provider receipts. Reimporting identical bytes preserves both. Repeated sends skip manual sent marks and current-token pending, confirmed or uncertain submissions. An explicit retry is available after a reported error; uploads are serialized.
 
