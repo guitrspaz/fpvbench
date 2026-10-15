@@ -2,7 +2,7 @@
 
 **Remember your setups. Organize your flights. See what changed.**
 
-FPVBench brings Betaflight setup history, copied DJI flight records, and your own flight observations together in one local drone workbench. Keep a reference setup, compare changes, and give every aircraft a history you can return to.
+FPVBench brings Betaflight setup history, copied flight records, and your own flight observations together in one local drone workbench. Keep a reference setup, compare changes, and give every aircraft a history you can return to.
 
 Built for FPV pilots with a growing fleet, with a place for DJI photography-drone records too.
 
@@ -13,7 +13,7 @@ Built for FPV pilots with a growing fleet, with a place for DJI photography-dron
 | Remember a setup you liked | Save named Betaflight snapshots and choose a preferred baseline for each aircraft. |
 | Understand what changed | Compare settings across snapshots, including PID/rate profiles, with readable changes and missing values marked as unknown. |
 | Sort a pile of flight records | Bulk import copied DJI files, match unique aircraft serials, and keep unknown records in an assignable inbox. |
-| Keep track of AirData uploads | Filter your local library and manually mark records as not uploaded or uploaded. |
+| Send originals to AirData | Select supported logs, submit them with an optional configured connection, and keep processing receipts alongside manual upload marks. |
 | Connect setups with observations | Record equipment, conditions, notes, results, and footage references in flight sessions; link the setup you used. |
 | Keep your fleet's history | Store registration IDs and serials; retire an aircraft from the active fleet while keeping its records. |
 | Get a quick explanation | Enable optional AI for setup explanations and a flight recap focused on the selected aircraft. |
@@ -32,9 +32,9 @@ Copy DJI flight records from your controller or goggles, then import a whole bat
 
 Exact original files are retained. Importing the same bytes again reuses the existing record. Available timestamps create linked sessions once an aircraft is assigned; add your own notes alongside the sourced measurements.
 
-Keep using AirData for comprehensive cloud analysis. FPVBench provides the local organization alongside it: which files you have imported, which aircraft they belong to, and which uploads you have manually recorded. It does not upload to AirData or verify upload history.
+Keep using AirData for comprehensive cloud analysis. Configure the optional connection to send selected supported originals and retain their processing results. Manual upload marks remain separate; files uploaded earlier through another route are not automatically discovered. A user upload token and an AirData-issued developer application key are required. [AirData connection and upload status →](repository-docs/airdata.md)
 
-Supported inputs are DJI FlightRecord TXT versions 1–14 and compatible decoded JSON exports. Newer encrypted TXT records supply their available local summary; supported older records and decoded JSON can also supply browsable telemetry. Compatibility depends on the file format, rather than the controller's name. [DJI imports and measurement details →](repository-docs/dji-flight-imports.md)
+DJI decoding supports FlightRecord TXT versions 1–14 and compatible decoded JSON exports. Other flight-log files can be retained as archives, including recognized PX4 ULog, ArduPilot DataFlash, MAVLink TLog/JSON-lines, and Betaflight Blackbox. Archive-only files retain exact originals and optional aircraft assignments, but supply no flight measurements or automatic sessions. Newer encrypted TXT records supply their available local summary; supported older records and decoded JSON can also supply browsable telemetry. Compatibility depends on the file format, rather than the controller's name. [DJI imports and measurement details →](repository-docs/dji-flight-imports.md)
 
 ## Optional AI, with you in control
 
@@ -51,7 +51,7 @@ Flight recaps send aggregate evidence and the selected aircraft's label. Exact c
 ## Your records, your preferences
 
 - **Local storage:** keep aircraft, setups, sessions, and imports on the computer running FPVBench. Core features need no cloud account.
-- **Complete backups:** export your workspace with original DJI files and available telemetry, then restore it when needed.
+- **Complete backups:** export your workspace with original log files, upload receipts, and available telemetry, then restore it when needed.
 - **Metric or Imperial:** choose display units for flight details, telemetry, and new recaps. Your browser remembers the choice.
 - **Active and retired fleets:** keep an older aircraft's history without keeping it in the active selector.
 - **Independent macOS startup:** run in the background, optionally start at login, and open the app from a clickable launcher.
@@ -84,7 +84,7 @@ Add an aircraft, import a setup or a batch of DJI files, and explore its history
 
 ## Guides and development
 
-[All documentation](repository-docs/README.md) · [Betaflight imports](repository-docs/betaflight-imports.md) · [DJI flight imports](repository-docs/dji-flight-imports.md) · [Optional AI](repository-docs/optional-ai.md) · [Backups](repository-docs/storage-and-backups.md) · [Architecture](repository-docs/architecture.md)
+[All documentation](repository-docs/README.md) · [Betaflight imports](repository-docs/betaflight-imports.md) · [Flight log imports](repository-docs/dji-flight-imports.md) · [AirData](repository-docs/airdata.md) · [Optional AI](repository-docs/optional-ai.md) · [Backups](repository-docs/storage-and-backups.md) · [Architecture](repository-docs/architecture.md)
 
 ```sh
 npm run check

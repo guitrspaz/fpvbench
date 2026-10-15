@@ -17,8 +17,8 @@ export async function runFleetJourney({ page, expect, baseURL }) {
   }
   const before = await readState();
   const records = ['FLEET-A', 'FLEET-B', 'FUTURE-O4', 'FUTURE-O4'].map((serial, index) => Buffer.from(JSON.stringify(decodedDjiFixture({ details: { ...decodedDjiFixture().details, aircraftSn: serial, rcSn: 'SHARED-CONTROLLER', startTime: `2026-10-14T${14 + index}:00:00Z` } }))));
-  await page.getByRole('button', { name: '↑ Import DJI flights', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Import DJI flights' });
+  await page.getByRole('button', { name: '↑ Import flight logs', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import flight logs' });
   await expect(dialog.getByLabel('Aircraft assignment')).toHaveValue('');
   await dialog.getByLabel('Source device (optional)').fill('Same remote');
   await dialog.getByLabel('Choose one or more flight records · maximum 25 MiB each').setInputFiles(records.map((buffer, index) => ({ name: `fleet-${index}.json`, mimeType: 'application/json', buffer })));
@@ -50,10 +50,10 @@ export async function runFleetJourney({ page, expect, baseURL }) {
   await expect(page.getByText('1 assigned · 0 still unassigned.', { exact: true })).toBeVisible();
   expect((await readState()).sessions).toHaveLength(before.sessions.length + 4);
   await page.reload();
-  await page.getByRole('button', { name: /DJI flight imports/ }).click();
+  await page.getByRole('button', { name: /Flight log library/ }).click();
   await expect(page.getByLabel('Filter aircraft assignment')).toHaveValue('all');
   const later = Buffer.from(JSON.stringify(decodedDjiFixture({ details: { ...decodedDjiFixture().details, aircraftSn: 'FUTURE-O4', startTime: '2026-10-14T18:00:00Z' } })));
-  await page.getByRole('button', { name: '↑ Import DJI flights', exact: true }).click();
+  await page.getByRole('button', { name: '↑ Import flight logs', exact: true }).click();
   await dialog.getByLabel('Choose one or more flight records · maximum 25 MiB each').setInputFiles([{ name: 'fleet-later.json', mimeType: 'application/json', buffer: later }, { name: 'fleet-renamed.json', mimeType: 'application/json', buffer: records[2] }]);
   await dialog.getByRole('button', { name: 'Import selected flights', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Import selected flights', exact: true })).toBeEnabled();

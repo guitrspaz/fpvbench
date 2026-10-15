@@ -113,3 +113,9 @@ The desktop comparison and mobile session screenshots were inspected. The compar
 - No live flight controller, firmware deployment, public hosting, or actual flight was involved. Reload checks persisted application state; storage restart/corruption behavior belongs to the separate store/API tests.
 
 See [validation.md](validation.md) for the broader validation record and [scope-v0.1.md](scope-v0.1.md) for the planned evidence boundary.
+
+## v0.5 AirData and archive journey — 2026-10-14
+
+The complete run passed 83 checks with no unexpected browser errors. New checks verify missing-key gating, write-only saves without provider calls, explicit verification, native/unknown archives without sessions, selected upload and refresh, confirmed receipt persistence after reload, repeated-send skipping, status filtering and detail rendering, credential-free export and absence of token storage in the browser.
+
+AirData transport and credentials were synthetic: four fake calls covered verification, destination lookup, upload and job polling. Existing AI journeys made seven fake calls. Automated browser checks opened no database and uploaded no personal originals.

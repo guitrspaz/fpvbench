@@ -91,6 +91,7 @@ export function validateQuestion(question) {
 
 /** Aggregate imported flights and unlinked manual sessions without double counting. */
 export function flightFacts(state) {
+  state = { ...state, flightLogs: state.flightLogs.filter(log => log.status !== 'archived') };
   // Only the independently verified v14/product family supplies usable TXT distance.
   const needsDistanceVerification = log => log.format === 'dji-txt' && log.logVersion === 14 && !verifiedDistance(log) && typeof log.summary.distanceMeters === 'number' && Number.isFinite(log.summary.distanceMeters) && log.summary.distanceMeters >= 0;
   const distanceWithheldFlightCount = state.flightLogs.filter(needsDistanceVerification).length;

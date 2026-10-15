@@ -12,6 +12,7 @@ export async function runStatusJourney({ page, expect, baseURL, baselineText }) 
   await add.getByLabel('Serial number').fill('LIFECYCLE-OLD');
   await add.getByRole('button', { name: 'Add aircraft', exact: true }).click();
   await expect(add).not.toBeVisible();
+  await expect(page.getByLabel('Selected aircraft').locator('option:checked')).toHaveText('Lifecycle old quad');
   const oldId = await page.getByLabel('Selected aircraft').inputValue();
   await page.locator('.heading-actions').getByRole('button', { name: '↑ Import setup', exact: true }).click();
   const imported = page.getByRole('dialog', { name: 'Import Betaflight setup' });

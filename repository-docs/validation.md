@@ -22,11 +22,19 @@ node dev/verify-sqlite.mjs
 node dev/verify-import.mjs
 node dev/verify-ai.mjs
 node dev/verify-distance.mjs
+node dev/verify-log-intake-airdata.mjs
 ```
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.4.6 results — 2026-10-14
+## Observed v0.5.0 results — 2026-10-14
+
+- 161 Jest tests passed across sixteen suites; ESLint passed. Added coverage includes archive recognition, malformed inputs, exact originals/dedupe, assignment, AI exclusion, receipt validation, write-only credentials, verification, trusted destinations, interrupted submissions, serialized duplicate requests, account separation and retained statuses.
+- 83 browser checks passed with synthetic records and a memory repository, including archive intake without sessions, explicit connection gating, selected sending, refresh, persisted receipts and credential-free exports. Four fake AirData and seven fake OpenAI requests; zero unexpected browser errors.
+- The separate disposable SQLite proof passed preserved originals/observations, confirmed receipts, restart dedupe, private credential retention and complete restore.
+- No personal log was uploaded and no live AirData call was used for validation. A developer application key and explicit connection check are still needed for real operation. Native format recognition is archive intake, not detailed telemetry parsing.
+
+## Historical v0.4.6 results — 2026-10-14
 
 - 142 Jest tests passed across thirteen suites; ESLint passed. New checks cover bounded source conversion, zero/missing measurements, unchanged JSON/other product types, backup-before-save ordering, refusal on mismatched source evidence or failed backup, preservation of notes/status/originals, restart idempotence, unit conversion, per-unit recap cache and API input validation.
 - The full synthetic browser journeys passed, including units accessible with AI disabled, preference persistence after reload, imperial flight-detail values and telemetry headers, and unchanged server-side data. Fake provider requests only; no paid AI calls.
@@ -100,6 +108,6 @@ Parser coverage includes Betaflight profile namespaces, sparse omissions, select
 
 ## Evidence limits
 
-Representative real files establish those records' local summary parsing; their exact originating controller/model/firmware combinations were not independently established. No claim is made for every RC, RC2, or Goggles N3 export variant. Version 14 telemetry remains encrypted and unavailable in this version. DAT and raw-record JSON are unsupported.
+Representative real files establish those records' local summary parsing; their exact originating controller/model/firmware combinations were not independently established. No claim is made for every RC, RC2, or Goggles N3 export variant. Version 14 telemetry remains encrypted and unavailable in this version. DAT remains unsupported; unrecognized accepted originals have archive-only status.
 
-AirData status is a manual record, not verification against AirData. No external upload, DJI keychain request, live hardware connection, controller restoration/deployment, or flight-performance validation occurred. This is single-workstation software; evidence does not establish authenticated internet hosting or multi-user support.
+Manual AirData status is separate from the optional provider receipt. A confirmed receipt establishes only the recorded submission processing result, not historical account reconciliation. No external upload, DJI keychain request, live hardware connection, controller restoration/deployment, or flight-performance validation occurred. This is single-workstation software; evidence does not establish authenticated internet hosting or multi-user support.

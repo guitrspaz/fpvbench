@@ -4,7 +4,7 @@
 
 FPVBench defaults to `~/.fpvbench/` on the computer running the server. Browser storage remembers the selected aircraft, fleet status filter and Metric/Imperial display preference. Display units do not change measurements in SQLite or exports. Set `FPVBENCH_DATA_DIR` to use another local directory.
 
-`workspace.sqlite` contains the catalog and decoded telemetry. Exact original DJI bytes live in `imports/` under their SHA-256 fingerprints. Keep the whole data directory together when moving it while the server is stopped.
+`workspace.sqlite` contains the catalog and decoded telemetry. Exact original log bytes live in `imports/` under their SHA-256 fingerprints. Keep the whole data directory together when moving it while the server is stopped.
 
 The app creates its directory and files with owner-only permissions. One live server owns each directory; a second process is rejected. Shut a manual server down with Ctrl+C, or use **Stop FPVBench** / `npm run service:stop` for the macOS background service, before a restore or filesystem copy.
 
@@ -30,6 +30,10 @@ The correction applies only to DJI TXT version 14/product type 137 (the independ
 
 IDs, assignments, sessions, notes, AirData status, other flight records, and original bytes remain unchanged. Corrected summaries retain their exact raw distance, kilometre source unit, and bounded verification basis. Reopening or reimporting does not multiply an already corrected value again. Restored older complete backups receive the same verification on their next open. Keep the matching imports directory with the pre-correction SQLite backup.
 
+## Broader archives and receipts in v0.5
+
+Catalog/SQLite version 3 now accepts archive-only formats and an optional AirData transfer payload on each log. No table migration is required. Existing records, identifiers, measurements, notes, original bytes and manual statuses are unchanged. Older complete backups remain valid; older app versions reject new formats/receipt fields rather than silently interpreting them.
+
 ## Complete export
 
 Use **Export workspace** in the interface. Version 3 JSON contains:
@@ -37,7 +41,8 @@ Use **Export workspace** in the interface. Version 3 JSON contains:
 - Aircraft, full Betaflight snapshots, and editable flight sessions.
 - Imported flight summaries and metadata, including unassigned inbox entries and aircraft serial evidence.
 - Aircraft serial aliases explicitly remembered for future routing.
-- Exact original DJI files encoded as base64.
+- Exact original log files encoded as base64, including archive-only records.
+- Optional AirData processing receipts, separate from manual upload marks.
 - All stored normalized telemetry frames.
 
 This is a complete portable backup rather than just a list of summaries. Keep it private; source files can contain flight locations and device identifiers.
@@ -72,6 +77,12 @@ The optional [macOS startup service](macos-startup.md) uses the same workspace a
 
 To preserve local AI history and settings, copy the whole data directory while the server is stopped and keep that copy private. A corrupt optional AI file leaves the core workspace usable; preserve the optional files before repairing them. See [optional AI](optional-ai.md).
 
+## Optional AirData file
+
+`.airdata-config.json` contains the server-held upload token, developer application key, opaque connection identity and verification timestamp. It is owner-private and excluded from complete catalog exports. Receipts are included, but a fresh restored directory needs connection configuration. Copy the whole stopped data directory to preserve credentials and their receipt identity together. A corrupt connection file disables uploads while preserving the file and core workspace.
+
 ## Local proof
 
 `node dev/verify-sqlite.mjs` runs an operational proof against disposable temporary data. It checks actual SQLite persistence/migration and backup/restore separately from automated checks, which use a memory repository. It does not operate on the normal personal workspace.
+
+`node dev/verify-log-intake-airdata.mjs` separately verifies archive and receipt persistence, original bytes, observations, restart dedupe and complete restore using disposable SQLite and a fake AirData transport.

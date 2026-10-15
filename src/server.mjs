@@ -1,4 +1,5 @@
 import { createServer as httpServer } from "node:http";
+import { createAirdataService } from './airdata.mjs';
 import { readFile, realpath } from "node:fs/promises";
 import { resolve, dirname, extname, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -95,6 +96,7 @@ export async function createServer({
   storeFactory = createStore,
   aiFactory,
   assistantFactory,
+  airdataFactory = createAirdataService,
 } = {}) {
   const store = await storeFactory(dataDir);
   let ai, assistant;
@@ -114,6 +116,7 @@ export async function createServer({
       close: ai.close,
     };
   }
+  const airdata = await airdataFactory(dataDir, { store });
   const automaticTasks = new Set();
   const automaticReviews = new Map();
   let closing = false;
@@ -124,7 +127,7 @@ export async function createServer({
       closeResourcesPromise = (async () => {
         await Promise.allSettled(automaticTasks);
         try { await assistant.close(); }
-        finally { try { await ai.close(); } finally { await store.close(); } }
+        finally { try { await ai.close(); } finally { try { await airdata.close(); } finally { await store.close(); } } }
       })();
     }
     return closeResourcesPromise;
@@ -167,6 +170,18 @@ export async function createServer({
       const match = path.match(
         /^\/api\/(aircraft|snapshots|sessions|flight-logs)\/([^/]+)(\/(?:raw|frames))?$/,
       );
+      if (path === "/api/airdata/settings" && req.method === "GET") return json(res, 200, await airdata.getSettings());
+      if (path === "/api/airdata/settings" && req.method === "PATCH") return json(res, 200, await airdata.updateSettings(await body(req, 4096)));
+      if (path === "/api/airdata/check" && req.method === "POST") { emptyAiBody(await body(req, 1024)); return json(res, 200, await airdata.checkConnection()); }
+      if (["/api/airdata/send", "/api/airdata/refresh"].includes(path) && req.method === "POST") {
+        const input = await body(req, 8192);
+        if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some(key => key !== "ids")) throw new AppError("Select log record IDs.");
+        return json(res, 200, await (path.endsWith("/send") ? airdata.sendLogs(input.ids) : airdata.refreshJobs(input.ids)));
+      }
+      if (path === "/api/log-imports" && req.method === "POST") {
+        const result = await store.importLog(await body(req, FLIGHT_BODY_LIMIT));
+        return json(res, result.duplicate ? 200 : 201, result);
+      }
       if (path.startsWith("/api/ai/")) {
         if (path === "/api/ai/settings" && req.method === "GET")
           return json(res, 200, publicAiSettings(await assistant.getSettings()));

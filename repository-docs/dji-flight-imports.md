@@ -2,16 +2,22 @@
 
 ## Copied files
 
-FPVBench reads files you select from your computer. It does not connect to a controller, goggles, or DJI account. Copy the flight records from your device first, use **Import DJI flights**. Files are handled individually so one unsupported file does not discard successful imports.
+FPVBench reads files you select from your computer. It does not connect to a controller, goggles, or DJI account. Copy the flight records from your device first, use **Import flight logs**. Files are handled individually so one unsupported file does not discard successful imports.
 
 Supported inputs:
 
 - Binary DJI FlightRecord TXT versions 1–14, decoded locally with [dji-log-parser-js](https://github.com/lvauvillier/dji-log-parser).
 - Decoded JSON from that parser with `version`, `details`, and `frames`, or compatible `version`, `summary`, and `frames`.
 
-TXT is a binary flight record, despite its extension; it is not pasted text. DAT files, raw-record JSON exports, arbitrary JSON, and media files are unsupported. The limit is 25 MiB per file and 100,000 telemetry frames.
+TXT is a binary flight record, despite its extension; it is not pasted text. DAT and media files are unsupported. Other valid JSON can be retained as an archive without DJI decoding. The limit is 25 MiB per file and 100,000 telemetry frames.
 
 The implementation pins decoder version 0.5.7. RC, RC2, and Goggles N3 are source labels, not a blanket guarantee that every firmware/export variant is supported. Compatibility with real user files must be checked with representative local samples.
+
+## Broader original archives in v0.5
+
+**Import flight logs** also accepts TXT, JSON, JSONL/NDJSON, LOG, BIN, TLOG, ULG, BBL/BFL, RIDLOG, CSV, GPX and KML originals. Content recognizers identify PX4 ULog, ArduPilot DataFlash, timestamped MAVLink TLog, a MAVLink JSON-lines profile with message metadata/data, and Betaflight Blackbox. Other accepted files remain unknown archives. A recognized DJI-shaped JSON must pass DJI validation; malformed JSON is rejected.
+
+Recognition is separate from decoding. These broader formats currently retain exact originals and optional aircraft assignments. You can record separate manual sessions for the aircraft. Their measurements stay null, they create no automatic sessions, and they are excluded from AI flight totals. A filename or extension never establishes a flight. There is no universal RIDLOG or MAVLink JSON file schema assumed here, and no native detailed parser or multi-file flight grouping yet.
 
 ## Bulk import and aircraft assignment
 
@@ -55,7 +61,7 @@ SHA-256 identifies the original bytes. Automatic reimporting of identical bytes 
 
 The library tracks uploads you perform in AirData using a manual status: **Not recorded**, **Not uploaded**, or **Uploaded**. New records start at Not recorded because the app cannot know whether you already uploaded them. Change the status from the detail view and filter the library by status. This status survives reimports, reloads, and complete backup/restore.
 
-FPVBench does not submit files to AirData or read its account history. A local import identifies files present in the workbench; it cannot detect flight files still on a controller. Copy files first, then import multiple records from your local folder. Identical files are recognized automatically.
+An optional connection can send selected supported originals and retain processing receipts; see [AirData uploads](airdata.md). FPVBench does not read account-wide historical uploads. A local import identifies files present in the workbench; it cannot detect flight files still on a controller. Copy files first, then import multiple records from your local folder. Identical files are recognized automatically.
 
 ## Local handling
 

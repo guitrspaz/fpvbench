@@ -21,3 +21,4 @@ imports/
 .ai-state.json
 .ai-reports.json
 .ai-write-*.tmp
+.airdata-config.json

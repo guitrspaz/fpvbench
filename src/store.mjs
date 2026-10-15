@@ -1,3 +1,5 @@
+import { validateTransfer } from './airdata-transfer.mjs';
+import { decodeLog } from './log-import.mjs';
 import { prepareDistanceRepair } from './dji-distance.mjs';
 import { mkdir, readFile, writeFile, unlink, lstat, open } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -211,7 +213,14 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
       }
       validateFlightLog(next, record); return { value: record };
     }),
-    importFlightLog: input => mutate(async next => {
+    importFlightLog: input => importRecord(input),
+    importLog: input => importRecord(input, true),
+    recordAirdataTransfer: (id, receipt) => mutate(next => {
+      validateTransfer(receipt); const log = getRecord(next, 'flightLogs', id);
+      log.airdataTransfer = copy(receipt); validateFlightLog(next, log); return { value: log };
+    }),
+  };
+  const importRecord = (input, receptive = false) => mutate(async next => {
       objectInput(input, ['aircraftId', 'filename', 'sourceDevice', 'contentBase64']);
       const manualAircraftId = input.aircraftId ?? null;
       if (manualAircraftId !== null) getRecord(next, 'aircraft', manualAircraftId);
@@ -224,13 +233,13 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
         return { value: { flightLog: existing, session: next.sessions.find(session => session.flightLogId === existing.id) ?? null, duplicate: true, routing: 'existing' } };
       }
       const decoder = decodeFlight ?? (await import('./dji-import.mjs')).decodeDjiFlight;
-      const decoded = await decoder(bytes, { filename: input.filename });
+      const decoded = receptive ? await decodeLog(bytes, { filename: input.filename, decodeDji: decoder }) : await decoder(bytes, { filename: input.filename });
       validateFrames(decoded.frames);
       const matches = matchAircraft(next, decoded.summary.aircraftSerial, decoded);
       const matchedAircraftId = manualAircraftId ?? (matches.length === 1 ? matches[0].id : null);
       const routing = manualAircraftId !== null ? 'manual' : matchedAircraftId !== null ? 'serial-match' : 'unassigned';
       const log = { id: randomUUID(), aircraftId: matchedAircraftId, filename: input.filename, sourceDevice, importedAt: timestamp(), sha256, byteLength: bytes.length, format: decoded.format, logVersion: decoded.logVersion, status: decoded.status, summary: copy(decoded.summary), frameCount: decoded.frames.length, warnings: copy(decoded.warnings), airdataStatus: 'unknown' };
-      if (log.summary.startTime === null) log.warnings.push('Start time is unavailable. The original was retained; create a session manually using a verified flight time.');
+      if (log.status !== 'archived' && log.summary.startTime === null) log.warnings.push('Start time is unavailable. The original was retained; create a session manually using a verified flight time.');
       validateFlightLog(next, log);
       next.flightLogs.push(log);
       const session = attachSession(next, log);
@@ -241,8 +250,7 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
       try { await writeFile(originalPath, bytes, { flag: 'wx', mode: 0o600 }); created = true; }
       catch (error) { if (error.code !== 'EEXIST') throw error; await safeOriginal(dataDir, log); }
       return { value: { flightLog: log, session, duplicate: false, routing }, persistence: { telemetry: { flightLogId: log.id, frames: decoded.frames } }, rollback: async () => { if (created) await unlink(originalPath); } };
-    }),
-  };
+    });
   store.getFlightLogRaw = store.getFlightOriginal;
   store.getFlightLogFrames = store.getFlightFrames;
   return store;

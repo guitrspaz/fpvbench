@@ -6,7 +6,7 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   const onPageError = error => errors.push(error.message);
   const onConsole = message => {
     if (message.type() !== 'error') return;
-    if (message.location().url === baseURL + '/api/flight-logs' && /422/.test(message.text())) expectedValidationErrors.push(message.text());
+    if (message.location().url === baseURL + '/api/log-imports' && /422/.test(message.text())) expectedValidationErrors.push(message.text());
     else errors.push(message.text());
   };
   page.on('pageerror', onPageError);
@@ -29,8 +29,8 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   const file = (name, buffer) => ({ name, mimeType: 'application/json', buffer });
   const readState = async () => (await page.request.get(baseURL + '/api/state')).json();
   const importFiles = async files => {
-    await page.locator('.heading-actions').getByRole('button', { name: '↑ Import DJI flights', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Import DJI flights' });
+    await page.locator('.heading-actions').getByRole('button', { name: '↑ Import flight logs', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import flight logs' });
     await dialog.getByLabel('Aircraft assignment').selectOption({ label: 'Synthetic smoke quad' });
     await dialog.getByLabel('Source device (optional)').fill('Synthetic DJI RC');
     await dialog.getByLabel('Choose one or more flight records · maximum 25 MiB each').setInputFiles(files);
@@ -66,7 +66,7 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   const storedBeforeUnits = await readState();
   await page.getByRole('button', { name: /Settings/ }).click();
   await page.getByLabel('Display units', { exact: true }).selectOption('imperial');
-  await page.getByRole('button', { name: /DJI flight imports/ }).click();
+  await page.getByRole('button', { name: /Flight log library/ }).click();
   await content.getByRole('button', { name: 'decoded-smoke.json', exact: true }).click();
   await expect(content.getByText('820.21 ft', { exact: true })).toBeVisible();
   await expect(content.getByText('98.43 ft', { exact: true })).toBeVisible();
@@ -76,7 +76,7 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   expect(await readState()).toEqual(storedBeforeUnits);
   await page.getByRole('button', { name: /Settings/ }).click();
   await page.getByLabel('Display units', { exact: true }).selectOption('metric');
-  await page.getByRole('button', { name: /DJI flight imports/ }).click();
+  await page.getByRole('button', { name: /Flight log library/ }).click();
   await content.getByRole('button', { name: 'decoded-smoke.json', exact: true }).click();
   await expect(content.getByText('1–100 of 101 frames', { exact: true })).toBeVisible();
   await expect(content.getByRole('button', { name: '← Previous', exact: true })).toBeDisabled();
@@ -146,7 +146,7 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   expect(reloaded.flightLogs.find(log => log.id === importedId).airdataStatus).toBe('uploaded');
 
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const name of [/Overview/, /Setup history/, /Compare setups/, /Flight sessions/, /DJI flight imports/]) {
+  for (const name of [/Overview/, /Setup history/, /Compare setups/, /Flight sessions/, /Flight log library/]) {
     await page.getByRole('button', { name }).click();
     await expect(page.locator('.loading')).toHaveCount(0);
     expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth + 1)).toBe(true);

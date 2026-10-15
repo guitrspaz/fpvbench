@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { AppError, assertSafeObject, containsControlText } from "./errors.mjs";
 import { parseExport } from "./parser.mjs";
+import { ARCHIVE_FORMATS } from './log-import.mjs';
+import { validateTransfer } from './airdata-transfer.mjs';
 import { hasVerifiedDistanceSummary, verifiedDistance } from './dji-distance.mjs';
 
 export const aircraftFields = ["name", "kind", "registrationId", "serialNumber", "flightRecordSerials", "status", "notes", "baselineSnapshotId"];
@@ -106,6 +108,7 @@ export function validateSession(state, record) {
   snapshotRelationship(state, record.aircraftId, record.snapshotId);
   if (record.flightLogId !== null) {
     const log = getRecord(state, "flightLogs", record.flightLogId);
+    if (log.status === "archived") throw new AppError("Archive-only files do not establish a flight session. Record a manual session with a file reference instead.");
     if (log.aircraftId !== record.aircraftId) throw new AppError("The flight log must belong to the same aircraft.");
     if (state.sessions.some(session => session.id !== record.id && session.flightLogId === record.flightLogId)) throw new AppError("This flight log already has a session.", 409);
   }
@@ -240,7 +243,7 @@ export function validateFrames(frames) {
 
 /** Validate immutable flight-log metadata and its aircraft relationship. */
 export function validateFlightLog(state, record) {
-  objectInput(record, ['id', 'aircraftId', 'filename', 'sourceDevice', 'importedAt', 'sha256', 'byteLength', 'format', 'logVersion', 'status', 'summary', 'frameCount', 'warnings', 'airdataStatus']);
+  objectInput(record, ['id', 'aircraftId', 'filename', 'sourceDevice', 'importedAt', 'sha256', 'byteLength', 'format', 'logVersion', 'status', 'summary', 'frameCount', 'warnings', 'airdataStatus', 'airdataTransfer']);
   if (!Object.hasOwn(record, 'airdataStatus')) record.airdataStatus = 'unknown';
   if (!['unknown', 'not-uploaded', 'uploaded'].includes(record.airdataStatus)) throw new AppError('Choose a valid manual AirData status.');
   if (record.aircraftId !== null) getRecord(state, 'aircraft', record.aircraftId);
@@ -249,8 +252,11 @@ export function validateFlightLog(state, record) {
   textField(record.sourceDevice, 'sourceDevice', { max: 200 });
   if (!/^[a-f0-9]{64}$/.test(record.sha256)) throw new AppError('Invalid flight checksum.');
   if (!Number.isInteger(record.byteLength) || record.byteLength < 1 || record.byteLength > 25 * 1024 * 1024) throw new AppError('Invalid flight byte length.');
-  if (!Number.isInteger(record.logVersion) || record.logVersion < 1 || record.logVersion > 255) throw new AppError('Invalid DJI log version.');
-  if (!['dji-txt', 'dji-json'].includes(record.format) || !['summary-only', 'decoded'].includes(record.status)) throw new AppError('Invalid DJI format or decode status.');
+  if (record.status === 'archived') {
+    if (!ARCHIVE_FORMATS.includes(record.format) || record.logVersion !== null || record.frameCount !== 0 || Object.values(record.summary).some(value => value !== null)) throw new AppError('Invalid archive-only log evidence.');
+  } else if (!Number.isInteger(record.logVersion) || record.logVersion < 1 || record.logVersion > 255) throw new AppError('Invalid DJI log version.');
+  if (record.status !== 'archived' && (!['dji-txt', 'dji-json'].includes(record.format) || !['summary-only', 'decoded'].includes(record.status))) throw new AppError('Invalid format or decode status.');
+  if (record.airdataTransfer !== undefined) validateTransfer(record.airdataTransfer);
   if (!Number.isInteger(record.frameCount) || record.frameCount < 0 || record.frameCount > 100000 || (record.status === 'summary-only' && record.frameCount !== 0)) throw new AppError('Invalid telemetry frame count.');
   if (!Array.isArray(record.warnings) || record.warnings.length > 1000) throw new AppError('Invalid flight warnings.');
   record.warnings.forEach(warning => textField(warning, 'warning', { max: 2000 }));

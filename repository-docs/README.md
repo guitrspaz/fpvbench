@@ -3,7 +3,8 @@
 - [Project quickstart](../README.md): start/stop the app and follow the first workflow.
 - [macOS startup](macos-startup.md): login service, clickable controls, updates, and removal.
 - [Betaflight imports](betaflight-imports.md): prepare exports and interpret their limits.
-- [DJI flight imports](dji-flight-imports.md): copied files, summaries, telemetry, and encryption limits.
+- [Flight log imports](dji-flight-imports.md): DJI decoding, broader original archives, assignment, and format limits.
+- [AirData uploads](airdata.md): optional connection, selected original uploads, and processing receipts.
 - [Optional AI](optional-ai.md): setup assistant, recap, API key, allowance, and privacy.
 - [v0.3 scope](scope-v0.3.md): optional OpenAI integration contract.
 - [Storage and backups](storage-and-backups.md): SQLite migration, complete exports, and local restore.
