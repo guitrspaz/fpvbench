@@ -4,11 +4,13 @@ Use the journal to remember what changed, what you noticed, and what you want to
 
 ## Record an entry
 
-Choose an aircraft, open **Journal**, and select **Add entry**.
+Choose an aircraft and open **Overview**. Its named journal panel shows entry and open-next-step counts. Choose **Open journal** to browse the history, or **Add entry** to record something directly.
 
 - **Change:** something you changed, such as props, a repair, or a setup.
 - **Observation:** something you noticed during or after a session.
 - **Next step:** something to return to later.
+
+The entry form displays a read-only **Aircraft** field. Saving attaches the entry directly to that aircraft; a setup or flight session is not required. This also supports DJI battery checks, aircraft inspections, problems, and repairs.
 
 Give the entry a title, add optional details, and choose its date and time. The form displays local time; stored timestamps include a timezone. You can optionally link a saved setup and a flight session belonging to that aircraft. Neither link confirms what was physically installed or establishes why the aircraft behaved a particular way.
 
@@ -22,13 +24,13 @@ You can edit an entry's type, title, details, event time, and links. Its ID and 
 
 ## Read the next-session brief
 
-**Overview → Next session** shows:
+**Overview → Next session** names the selected aircraft and shows:
 
 - Up to three open next steps, oldest event time first, with the total open count.
 - Up to three recent changes and observations, newest event time first.
 - The most recent recorded flight session and saved setup, plus a preferred baseline if selected.
 
-Use **Add next step** for a quick reminder or **Open aircraft journal** for the complete history. Links open the referenced setup or session.
+Use **Add next step** for a quick reminder or the aircraft-named journal link for the complete history. The journal page also names its aircraft and provides **Aircraft overview** navigation. Links open the referenced setup or session.
 
 Setup confirmation means a recorded session explicitly says that setup was checked for that session. It does not establish the current controller configuration, flightworthiness, or a performance conclusion. Missing records remain explicit. The brief uses stored records and ordinary code; it makes no AI call and sends no journal text to OpenAI or AirData.
 

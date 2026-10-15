@@ -125,3 +125,9 @@ AirData transport and credentials were synthetic: four fake calls covered verifi
 The complete synthetic run passed 100 checks with no unexpected browser errors. Seventeen new checks cover empty briefs without AI, all three entry kinds, optional setup/session links, inert text, editing while preserving event timestamps, the overview brief, done/set-aside/reopen, filters, reload, aircraft isolation, retired history, a delayed response after aircraft switching, mobile layout, complete export and no new provider calls.
 
 Desktop and 390-pixel mobile screenshots were inspected. Existing journeys retained seven fake OpenAI requests and four fake AirData requests. No database, personal workspace, actual upload or billed request was used.
+
+## v0.6.1 visible aircraft ownership — 2026-10-15
+
+The complete synthetic browser journey passed 104 checks. Four added checks cover aircraft-named headings, opening a journal from its Overview panel, a read-only Aircraft field in the entry form, and a DJI-style aircraft entry without setup/session links. Switching aircraft keeps the journals separate. The global Journal navigation item was removed; Overview remains the parent location.
+
+Existing lifecycle, delayed-response, mobile, export and fake-provider checks remain covered. No database, personal records, real upload or billed request was used.

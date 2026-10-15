@@ -6,20 +6,28 @@ export async function runJournalJourney({page,expect,baseURL,baselineText,screen
     const r=await page.request.fetch(baseURL+path,{method,data:input});expect(r.ok()).toBe(true);return r.json();
   };
   const aircraft=await post('/api/aircraft',{name:'Journal test quad'});
-  const other=await post('/api/aircraft',{name:'Journal other quad'});
+  const other=await post('/api/aircraft',{name:'Journal DJI quad',kind:'DJI camera drone'});
   const setup=await post('/api/snapshots',{aircraftId:aircraft.id,label:'Journal reference',filename:'synthetic.txt',rawText:baselineText});
   const session=await post('/api/sessions',{aircraftId:aircraft.id,title:'Journal first flight',flownAt:'2026-10-14T12:00:00Z',snapshotId:setup.id,confirmedSetup:true});
   await page.reload();
   await page.getByLabel('Fleet status filter',{exact:true}).selectOption('all');
   await expect(page.getByLabel('Selected aircraft').locator('option[value="'+aircraft.id+'"]')).toHaveCount(1);
   await page.getByLabel('Selected aircraft').selectOption(aircraft.id);
+  async function openJournalFromOverview() {
+    await page.getByRole('button',{name:'Overview',exact:true}).click();
+    await page.locator('#aircraft-journal-panel').getByRole('button',{name:'Open journal',exact:true}).click();
+  }
   const brief=page.locator('#next-session-brief');
+  await expect(brief.getByRole('heading',{name:'Next session · '+aircraft.name,exact:true})).toBeVisible();
+  await expect(page.locator('nav').getByRole('button',{name:'Journal',exact:true})).toHaveCount(0);
+  await expect(page.locator('#aircraft-journal-panel').getByRole('heading',{name:aircraft.name+' journal',exact:true})).toBeVisible();
   await expect(brief.getByText('Open next steps (0)',{exact:true})).toBeVisible();
   await expect(brief.getByText('A recorded session confirms using this snapshot. This does not confirm the aircraft’s current settings.',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Journal',exact:true}).click();
+  await openJournalFromOverview();
   const dialog=page.getByRole('dialog',{name:'Add journal entry',exact:true});
   async function add(kind,title,details='') {
     await page.getByRole('button',{name:'+ Add entry',exact:true}).click();
+    await expect(dialog.getByLabel('Aircraft',{exact:true})).toHaveValue(aircraft.name);
     await dialog.getByRole('combobox',{name:'Entry type',exact:true}).selectOption(kind);
     await dialog.getByLabel('Title',{exact:true}).fill(title);
     await dialog.getByLabel('Details',{exact:true}).fill(details);
@@ -49,7 +57,7 @@ export async function runJournalJourney({page,expect,baseURL,baselineText,screen
   await expect(brief.getByRole('heading',{name:'Compare rates gently',exact:true})).toBeVisible();
   await brief.getByRole('button',{name:'Mark done',exact:true}).click();
   await expect(brief.getByText('Open next steps (0)',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Journal',exact:true}).click();
+  await openJournalFromOverview();
   await page.getByLabel('Filter journal entries').selectOption('closed');
   card=page.locator('#journal-list .journal-entry');
   await expect(card).toHaveCount(1);
@@ -72,7 +80,7 @@ export async function runJournalJourney({page,expect,baseURL,baselineText,screen
   await expect(brief.getByText('Open next steps (1)',{exact:true})).toBeVisible();
 
   // A delayed brief for another aircraft must never replace the current selection.
-  await page.getByRole('button',{name:'Journal',exact:true}).click();
+  await openJournalFromOverview();
   let arrived,release;
   const pending=new Promise(resolve=>{arrived=resolve;});
   const held=new Promise(resolve=>{release=resolve;});
@@ -94,9 +102,34 @@ export async function runJournalJourney({page,expect,baseURL,baselineText,screen
   if(screenshotDir)await page.screenshot({path:screenshotDir+'/journal-mobile.png',fullPage:true});
   await page.setViewportSize({width:1440,height:1000});
   if(screenshotDir)await page.screenshot({path:screenshotDir+'/journal-overview.png',fullPage:true});
+
+  // A DJI-style aircraft with no setup or flight session still owns its journal directly.
+  await page.getByLabel('Selected aircraft').selectOption(other.id);
+  await page.getByRole('button',{name:'Overview',exact:true}).click();
+  await expect(brief.getByRole('heading',{name:'Next session · '+other.name,exact:true})).toBeVisible();
+  await page.locator('#aircraft-journal-panel').getByRole('button',{name:'+ Add entry',exact:true}).click();
+  await expect(dialog.getByLabel('Aircraft',{exact:true})).toHaveValue(other.name);
+  await expect(dialog.getByLabel('Aircraft',{exact:true})).toHaveAttribute('readonly','');
+  await expect(dialog.getByRole('combobox',{name:'Linked setup',exact:true})).toHaveValue('');
+  await expect(dialog.getByRole('combobox',{name:'Linked flight session',exact:true})).toHaveValue('');
+  await dialog.getByRole('combobox',{name:'Entry type',exact:true}).selectOption('observation');
+  await dialog.getByLabel('Title',{exact:true}).fill('Battery check and aircraft inspection');
+  await dialog.getByLabel('Details',{exact:true}).fill('Inspection notes; repair follow-up to consider.');
+  await dialog.getByRole('button',{name:'Save entry',exact:true}).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByRole('heading',{name:other.name+' journal',exact:true})).toBeVisible();
+  await expect(page.locator('#journal-list').getByRole('heading',{name:'Battery check and aircraft inspection',exact:true})).toBeVisible();
+  const linkedState=await(await page.request.get(baseURL+'/api/state')).json();
+  expect(linkedState.aircraft.find(a=>a.id===other.id).journalEntries[0]).toMatchObject({snapshotId:null,sessionId:null,title:'Battery check and aircraft inspection'});
+  await page.getByLabel('Selected aircraft').selectOption(aircraft.id);
+  await expect(page.getByRole('heading',{name:aircraft.name+' journal',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Battery check and aircraft inspection',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'← Aircraft overview',exact:true}).click();
+  await expect(page.locator('#aircraft-journal-panel').getByRole('heading',{name:aircraft.name+' journal',exact:true})).toBeVisible();
+
   const backup=await(await page.request.get(baseURL+'/api/export')).json();
   expect(backup.aircraft.find(a=>a.id===aircraft.id).journalEntries).toHaveLength(3);
   expect(provider.calls).toHaveLength(beforeAi);expect(airdata.calls).toHaveLength(beforeAirdata);
   expect(errors).toEqual([]);page.off('pageerror',onError);
-  return {errors,passed:['empty brief without AI','all three journal kinds','optional setup and session links','inert journal text','edit preserves event timestamp','overview brief','mark done','closed filter','reopen','set aside','reload persistence','aircraft isolation','retired history','late brief ignored after aircraft switch','mobile overflow','complete export','no provider calls']};
+  return {errors,passed:['aircraft ownership headings','overview journal entry point','read-only aircraft in form','DJI inspection entry without setup/session','empty brief without AI','all three journal kinds','optional setup and session links','inert journal text','edit preserves event timestamp','overview brief','mark done','closed filter','reopen','set aside','reload persistence','aircraft isolation','retired history','late brief ignored after aircraft switch','mobile overflow','complete export','no provider calls']};
 }

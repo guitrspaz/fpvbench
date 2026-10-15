@@ -35,7 +35,6 @@
         <button class="nav-item" data-view="compare">
           <span aria-hidden="true">⇄</span> Compare setups
         </button>
-        <button class="nav-item" data-view="journal"><span aria-hidden="true">✎</span> Journal</button>
         <button class="nav-item" data-view="sessions">
           <span aria-hidden="true">↗</span> Flight sessions
         </button>
@@ -49,7 +48,7 @@
         <p>Your exports stay on this computer. No controller connection.</p>
       </div>
       <a class="export-link" href="/api/export" download>↓ Export workspace</a>
-      <span class="version">FPVBENCH / v0.6</span>
+      <span class="version">FPVBENCH / v0.6.1</span>
     </aside>
     <main>
       <header class="topbar">
@@ -84,6 +83,8 @@
     <dialog id="journal-dialog" aria-labelledby="journal-dialog-title">
       <form id="journal-form">
         <div class="dialog-heading"><div><p class="eyebrow">AIRCRAFT MEMORY</p><h2 id="journal-dialog-title">Add journal entry</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close journal dialog">×</button></div>
+        <label>Aircraft<input name="aircraftName" readonly /></label>
+        <p class="form-help">Saved directly to this aircraft. Setup and flight-session links below are optional.</p>
         <label>Entry type<select name="kind"><option value="change">Change</option><option value="observation">Observation</option><option value="next-step">Next step</option></select></label>
         <label>Title<input name="title" required maxlength="200" autocomplete="off" placeholder="What changed, what did you notice, or what is next?" /></label>
         <label>Details<textarea name="details" rows="4" maxlength="10000"></textarea></label>

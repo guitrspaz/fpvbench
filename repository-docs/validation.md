@@ -28,7 +28,13 @@ node dev/verify-journal.mjs
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.6.0 results — 2026-10-15
+## Observed v0.6.1 results — 2026-10-15
+
+- ESLint and all 175 Jest tests passed; the complete synthetic browser run passed 104 checks with no unexpected browser errors.
+- Added browser evidence covers named overview/journal/brief ownership, the overview journal entry point, the read-only aircraft field, and a DJI inspection/battery entry with no linked setup or session. Existing aircraft isolation, lifecycle, delayed-response, mobile and export journeys remain covered.
+- This change updates interface/navigation only. Journal APIs and persistence remain unchanged; no migration, provider request or personal-data fixture was introduced.
+
+## Historical v0.6.0 results — 2026-10-15
 
 - 175 Jest tests passed across eighteen suites; ESLint passed. Journal checks cover entry creation/editing, lifecycle, strict fields and references, global IDs, limits, atomic failure, older records, export validation, retirement and session/flight reassignment.
 - The complete synthetic browser run passed 100 checks, including all journal types, optional links, inert text, editing without changing event timestamps, the overview brief, completion/set-aside/reopening, filters, reload, aircraft isolation, late-response handling, retired history, mobile layout and complete export.

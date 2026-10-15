@@ -224,16 +224,16 @@ async function render() {
   const revision = ++renderRevision;
   const [eyebrow, title, description] = viewCopy[currentView];
   $("#page-eyebrow").textContent = eyebrow;
-  $("#page-title").textContent = title;
+  $("#page-title").textContent = currentView==="journal"&&selectedAircraft()? `${selectedAircraft().name} journal` : title;
   $("#page-description").textContent = selectedAircraft() && !["settings", "flights"].includes(currentView)
     ? `${selectedAircraft().name} · ${description}`
     : description;
   $("#breadcrumb").textContent =
     `WORKBENCH / ${currentView === "history" ? "SETUP HISTORY" : currentView.toUpperCase()}`;
   document.querySelectorAll(".nav-item").forEach((item) => {
-    const active = item.dataset.view === currentView;
+    const active = item.dataset.view === currentView || (currentView==="journal"&&item.dataset.view==="overview");
     item.classList.toggle("active", active);
-    if (active) item.setAttribute("aria-current", "page");
+    if (active) item.setAttribute("aria-current", currentView==="journal"?"location":"page");
     else item.removeAttribute("aria-current");
   });
   $(".heading-actions").hidden = currentView === "settings";
@@ -407,6 +407,7 @@ function showOverview() {
     );
   content.replaceChildren(
     stats,
+    aircraftJournalPanel(aircraft),
     nextSessionPanel(renderRevision,aircraftId),
     aircraftPanel,
     element("div", { class: "two-col" }, historyPanel, baselinePanel),
@@ -415,6 +416,17 @@ function showOverview() {
   if (aiSettings.available) content.append(recapPanel(renderRevision));
 }
 
+
+
+function aircraftJournalPanel(aircraft) {
+  const entries=aircraft.journalEntries??[];
+  const open=entries.filter(entry=>entry.kind==="next-step"&&entry.status==="open").length;
+  return element("section",{class:"panel aircraft-journal",id:"aircraft-journal-panel"},
+    panelHeading(`${aircraft.name} journal`,"Battery checks, aircraft inspections, problems, repairs, and flight observations."),
+    element("p",{class:"item-meta",text:`${entries.length} ${entries.length===1?"entry":"entries"} · ${open} open next ${open===1?"step":"steps"}`}),
+    element("p",{class:"form-help",text:"Every entry belongs directly to this aircraft. Linking a setup or flight session is optional."}),
+    element("div",{class:"journal-actions"},button("Open journal",()=>navigate("journal"),"primary"),button("+ Add entry",()=>openJournal(),"secondary")));
+}
 
 const journalKindLabel = kind => ({change:"Change",observation:"Observation","next-step":"Next step"})[kind];
 const journalStatusLabel = status => ({recorded:"Recorded",open:"Open",done:"Done","set-aside":"Set aside"})[status];
@@ -455,6 +467,7 @@ function openJournal(entry=null,kind="change") {
   if(!aircraftId)return;
   journalEditing={aircraftId,entryId:entry?.id??null};
   const form=$("#journal-form");form.reset();
+  form.elements.aircraftName.value=selectedAircraft().name;
   $("#journal-dialog-title").textContent=entry?"Edit journal entry":"Add journal entry";
   for(const key of ["kind","title","details","status"]) form.elements[key].value=entry?.[key]??({kind,status:"open",title:"",details:""}[key]);
   form.elements.occurredAt.value=localDateTime(entry?.occurredAt??new Date());
@@ -488,12 +501,13 @@ function showJournal() {
     if(!chosen.length)list.append(element("p",{class:"muted",text:entries.length?"No entries match this filter.":"No journal entries yet. Record a change, an observation, or something to try next."}));
   };
   filter.addEventListener("change",draw);draw();
-  content.replaceChildren(element("section",{class:"panel"},panelHeading("Aircraft journal","Changes, observations, and next steps stay with this aircraft.",button("+ Add entry",()=>openJournal(),"primary")),element("div",{class:"toolbar"},filter),list));
+  content.replaceChildren(button("← Aircraft overview",()=>navigate("overview"),"text-button"),element("section",{class:"panel"},panelHeading("Journal entries","Battery checks, inspections, problems, repairs, observations, and next steps for this aircraft.",button("+ Add entry",()=>openJournal(),"primary")),element("div",{class:"toolbar"},filter),list));
 }
 
 function nextSessionPanel(revision,ownerId) {
+  const ownerName=state.aircraft.find(aircraft=>aircraft.id===ownerId)?.name??"Selected aircraft";
   const panel=element("section",{class:"panel next-session",id:"next-session-brief"},
-    panelHeading("Next session","Pick up where you left off.",button("+ Add next step",()=>openJournal(null,"next-step"),"text-button")),
+    panelHeading(`Next session · ${ownerName}`,"Pick up where you left off.",button("+ Add next step",()=>openJournal(null,"next-step"),"text-button")),
     element("p",{class:"loading",text:"Loading this aircraft’s brief…"}));
   api(`/api/aircraft/${encodeURIComponent(ownerId)}/brief`).then(brief=>{
     if(revision!==renderRevision||aircraftId!==ownerId)return;
@@ -516,7 +530,7 @@ function nextSessionPanel(revision,ownerId) {
         element("p",{class:"proof-note",text:brief.latestSnapshot.confirmedInSession?"A recorded session confirms using this snapshot. This does not confirm the aircraft’s current settings.":"No recorded session confirms using this snapshot. Current aircraft settings are not known."}));
     } else context.append(element("p",{class:"item-meta",text:"No saved setup for this aircraft."}));
     if(brief.baseline)context.append(element("p",{class:"item-meta",text:`Preferred baseline: ${brief.baseline.label}`}));
-    panel.append(context,button("Open aircraft journal →",()=>navigate("journal"),"text-button"));
+    panel.append(context,button(`Open ${ownerName} journal →`,()=>navigate("journal"),"text-button"));
   }).catch(error=>{
     if(revision===renderRevision&&aircraftId===ownerId) {
       $(".loading",panel)?.remove();panel.append(element("p",{class:"form-error",text:error.message}));

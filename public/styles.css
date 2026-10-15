@@ -1015,3 +1015,9 @@ input[type="file"]::file-selector-button {
 .brief-context .proof-note { margin:0; }
 #journal-list { margin-top:15px; }
 #journal-form textarea { resize:vertical; }
+
+.aircraft-journal .panel-heading h2,.next-session .panel-heading h2,#page-title { overflow-wrap:anywhere;min-width:0; }
+.aircraft-journal .form-help { margin-top:12px; }
+#journal-form input[readonly] { border-color:var(--amber);font-weight:600; }
+
+.next-session > .text-button { white-space:normal;text-align:left;overflow-wrap:anywhere;max-width:100%; }
