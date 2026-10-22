@@ -89,9 +89,11 @@ The optional [macOS startup service](macos-startup.md) uses the same workspace a
 
 To preserve local AI history and settings, copy the whole data directory while the server is stopped and keep that copy private. A corrupt optional AI file leaves the core workspace usable; preserve the optional files before repairing them. See [optional AI](optional-ai.md).
 
-## Optional AirData file
+## Historical AirData configuration and receipts
 
-`.airdata-config.json` contains the server-held upload token, developer application key, opaque connection identity and verification timestamp. It is owner-private and excluded from complete catalog exports. Receipts are included, but a fresh restored directory needs connection configuration. Copy the whole stopped data directory to preserve credentials and their receipt identity together. A corrupt connection file disables uploads while preserving the file and core workspace.
+An existing owner-private `.airdata-config.json` may contain upload credentials, a connection identity and verification timestamp. The app leaves it untouched and never reads it while integration is deferred. It remains excluded from complete catalog exports. A private whole-directory copy made while the app is stopped can preserve it, but it is unnecessary for manual tracking or historical receipts.
+
+Manual marks and provider receipts remain in the catalog and complete exports/restores. Historical receipt display is independent of the old connection identity and shows the last saved evidence without querying AirData. No schema migration or credential cleanup accompanies this deferral. See [manual tracking](airdata.md).
 
 ## Local proof
 

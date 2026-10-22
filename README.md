@@ -13,8 +13,8 @@ Built for FPV pilots with a growing fleet, with a place for DJI photography-dron
 | Remember a setup you liked | Save named Betaflight snapshots and choose a preferred baseline for each aircraft. |
 | Understand what changed | Compare settings across snapshots, including PID/rate profiles, with readable changes and missing values marked as unknown. |
 | Sort a pile of flight records | Bulk import copied DJI files, match unique aircraft serials, and keep unknown records in an assignable inbox. |
-| See what still needs filing | Scan a local record folder for new originals, extra copies, unassigned imports, and AirData follow-up. |
-| Send originals to AirData | Select supported logs, submit them with an optional configured connection, and keep processing receipts alongside manual upload marks. |
+| See what still needs filing | Scan a local record folder for new originals, extra copies, and unassigned imports. |
+| Track uploads made elsewhere | Optionally record manual upload marks, including uploads to AirData; no files are sent or verified. |
 | Pick up where you left off | Keep an aircraft journal of changes, observations, and next steps; see open items and recent context on Overview. |
 | Connect setups with observations | Record equipment, conditions, notes, results, and footage references in flight sessions; link the setup you used. |
 | Keep your fleet's history | Store registration IDs and serials; retire an aircraft from the active fleet while keeping its records. |
@@ -40,9 +40,9 @@ Copy DJI flight records from your controller or goggles, then import a whole bat
 
 Exact original files are retained. Importing the same bytes again reuses the existing record. Available timestamps create linked sessions once an aircraft is assigned; add your own notes alongside the sourced measurements.
 
-Review a copied-record folder before importing. See which originals are new, which are duplicates, and which imported records need assignment or AirData follow-up. Select the new files you want to keep; scanning leaves the source folder unchanged. [Import filing guide →](repository-docs/import-filing.md)
+Review a copied-record folder before importing. See which originals are new, which are duplicates, and which imported records need assignment. Select the new files you want to keep; scanning leaves the source folder unchanged. [Import filing guide →](repository-docs/import-filing.md)
 
-Keep using AirData for comprehensive cloud analysis. Configure the optional connection to send selected supported originals and retain their processing results. Manual upload marks remain separate; files uploaded earlier through another route are not automatically discovered. A user upload token and an AirData-issued developer application key are required. [AirData connection and upload status →](repository-docs/airdata.md)
+AirData integration is deferred. Local flight records remain usable without it. Enable **Show manual upload tracking** in the library to record uploads made elsewhere. Unmarked records mean **Not recorded** and do not become an upload to-do list. [Manual tracking and historical receipts →](repository-docs/airdata.md)
 
 DJI decoding supports FlightRecord TXT versions 1–14 and compatible decoded JSON exports. Other flight-log files can be retained as archives, including recognized PX4 ULog, ArduPilot DataFlash, MAVLink TLog/JSON-lines, and Betaflight Blackbox. Archive-only files retain exact originals and optional aircraft assignments, but supply no flight measurements or automatic sessions. Newer encrypted TXT records supply their available local summary; supported older records and decoded JSON can also supply browsable telemetry. Compatibility depends on the file format, rather than the controller's name. [DJI imports and measurement details →](repository-docs/dji-flight-imports.md)
 
@@ -94,7 +94,7 @@ Add an aircraft, import a setup or a batch of DJI files, and explore its history
 
 ## Guides and development
 
-[All documentation](repository-docs/README.md) · [Betaflight imports](repository-docs/betaflight-imports.md) · [Flight log imports](repository-docs/dji-flight-imports.md) · [AirData](repository-docs/airdata.md) · [Optional AI](repository-docs/optional-ai.md) · [Backups](repository-docs/storage-and-backups.md) · [Architecture](repository-docs/architecture.md)
+[All documentation](repository-docs/README.md) · [Betaflight imports](repository-docs/betaflight-imports.md) · [Flight log imports](repository-docs/dji-flight-imports.md) · [Manual upload tracking](repository-docs/airdata.md) · [Optional AI](repository-docs/optional-ai.md) · [Backups](repository-docs/storage-and-backups.md) · [Architecture](repository-docs/architecture.md)
 
 ```sh
 npm run check

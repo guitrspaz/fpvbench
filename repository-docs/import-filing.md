@@ -12,12 +12,11 @@ Choose **Scan folder** to compare file contents with the originals already in FP
 | Already imported | Files whose exact bytes match a saved original, even if the filename changed. |
 | Extra copies | Additional files with the same bytes as an earlier file in this scan. Only the first new copy can be selected. |
 | Unassigned imports | Imported originals in this folder that still need an aircraft assignment. New files are routed when imported. |
-| AirData to review | Supported imported formats marked needs sending, with a failed submission, or without confirmation. |
 | Blocked files | Files that could not be safely read, including empty or oversized files. |
 
-Counts describe this folder snapshot and overlap. A duplicate can also be unassigned or need AirData review. Unassigned and AirData counts count unique imported records; the file list can contain several copies of one record.
+Counts describe this folder snapshot and overlap. A duplicate can also be unassigned. Unassigned counts count unique imported records; the file list can contain several copies of one record.
 
-Use the filter to focus on a category. **Refresh saved statuses** rereads aircraft assignments and upload marks from the library without rescanning the folder. Choose **Scan folder** again to discover files copied there since the last scan.
+Use the filter to focus on a category. **Refresh saved statuses** rereads aircraft assignments and import states from the library without rescanning the folder. Choose **Scan folder** again to discover files copied there since the last scan.
 
 ## Import what you choose
 
@@ -25,15 +24,11 @@ Select individual new files, or filter to **New originals** and choose **Select 
 
 FPVBench checks that each source still matches the scan before importing it. If a file changed or disappeared, scan again. Existing originals are reused without replacing their assignment, observations, or upload status.
 
-Aircraft serials and remembered aliases route unique matches automatically. Shared controllers and goggles do not determine the aircraft. Unknown or ambiguous identities remain unassigned. Use **Open imported record** or return to **Flight log library** for assignment and upload actions. Archive-only records retain their originals without creating flight measurements or sessions.
+Aircraft serials and remembered aliases route unique matches automatically. Shared controllers and goggles do not determine the aircraft. Unknown or ambiguous identities remain unassigned. Use **Open imported record** or return to **Flight log library** for assignment and optional manual upload tracking. Archive-only records retain their originals without creating flight measurements or sessions.
 
-## AirData follow-up
+## Optional manual upload tracking
 
-Unmarked imports default to **Not uploaded (default)** and join the upload to-do list. A file may already be in AirData through another route; this default does not query your account's history. Use manual marks for uploads made elsewhere. A manual sent mark removes the record from the review queue.
-
-To mark a group, return to **Flight log library**, set the aircraft and AirData filters, choose **Select all matching**, then **Mark selected as uploaded**. Return here and choose **Refresh saved statuses**. These manual marks need no AirData key and send no files. See [bulk marking](airdata.md#mark-uploads-made-elsewhere).
-
-Processing, confirmed, and uncertain submissions are kept out of that queue. An uncertain outcome needs a check in AirData before considering another send. Sending remains a separate selected action in the library and requires the configured AirData connection. See [AirData uploads](airdata.md).
+Folder review focuses on local originals, duplicates, assignments and blocked files. It has no upload queue. To record uploads made elsewhere, enable **Show manual upload tracking** in **Flight log library**. These marks do not affect folder-review counts. See [manual tracking](airdata.md#mark-uploads-made-elsewhere).
 
 ## Local preferences and scan limits
 

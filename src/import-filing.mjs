@@ -7,7 +7,6 @@ import {AppError} from './errors.mjs';
 import {objectInput,textField} from './workspace-validation.mjs';
 import {readPrivateJson,writePrivateJson} from './ai-private-files.mjs';
 import {supportsLogFilename} from './log-import.mjs';
-import {UPLOAD_FORMATS} from './airdata-transfer.mjs';
 
 const CONFIG='.filing-config.json';
 const defaults={entries:5000,files:2000,depth:8,bytes:2*1024**3,ms:30000,ttlMs:30*60*1000,fileBytes:25*1024*1024};
@@ -22,16 +21,8 @@ function normalizeFolder(value) {
   return resolve(expanded);
 }
 
-/** Describe local upload evidence, without asking AirData about historical account inventory. */
-export function airdataFilingState(log,accountId) {
-  const receipt=log.airdataTransfer?.accountId===accountId?log.airdataTransfer:null;
-  const state=receipt?(receipt.status==='submitting'?'unknown':receipt.status==='preparing'?'error':receipt.status):log.airdataStatus==='uploaded'?'manual-sent':log.airdataStatus==='not-uploaded'?'needs-send':'unconfirmed';
-  const eligible=UPLOAD_FORMATS.includes(log.format);
-  return {state,eligible,needsReview:eligible&&log.airdataStatus!=='uploaded'&&['needs-send','unconfirmed','error'].includes(state)};
-}
-
 /** Explicit folder scans and imports. Source folders are never modified; scans and paths are computer-local. */
-export async function createFilingService(dataDir,{store,airdata,defaultFolder=join(homedir(),'Documents','FlightRecords'),limits:overrides={},now=Date.now}={}) {
+export async function createFilingService(dataDir,{store,defaultFolder=join(homedir(),'Documents','FlightRecords'),limits:overrides={},now=Date.now}={}) {
   const limits={...defaults,...overrides};
   let config={version:1,folder:normalizeFolder(defaultFolder),includeSubfolders:true},locked=false,closed=false,busy=false,active=Promise.resolve(),snapshot=null;
   try {
@@ -99,24 +90,20 @@ export async function createFilingService(dataDir,{store,airdata,defaultFolder=j
     if(snapshot&&now()>=snapshot.expiresMs)snapshot=null;
     return snapshot;
   }
-  async function report() {
+  function report() {
     const scan=current();if(!scan)return null;
     const state=store.getState(),catalog=new Map(state.flightLogs.map(log=>[log.sha256,log]));
-    const accountId=(await airdata?.getSettings())?.accountId??null;
-    const unassigned=new Set(),review=new Set(),uncertain=new Set(),newHashes=new Set();
+    const unassigned=new Set(),newHashes=new Set();
     const files=scan.files.map(file=>{
       const log=file.sha256?catalog.get(file.sha256):null;
-      const upload=log?airdataFilingState(log,accountId):null;
       if(log?.aircraftId===null)unassigned.add(log.id);
-      if(upload?.needsReview)review.add(log.id);
-      if(upload?.state==='unknown')uncertain.add(log.id);
       if(!log&&file.sha256)newHashes.add(file.sha256);
       return {id:file.id,relativePath:file.relativePath,byteLength:file.byteLength,modifiedAt:file.modifiedAt??null,sha256:file.sha256??null,duplicateOf:file.duplicateOf??null,error:file.error??null,errorCode:file.errorCode??null,
         libraryState:file.error?'blocked':log?'imported':'new',importable:!file.error&&!log&&!file.duplicateOf,
-        logId:log?.id??null,aircraftId:log?.aircraftId??null,aircraftName:log?state.aircraft.find(aircraft=>aircraft.id===log.aircraftId)?.name??null:null,airdata:upload};
+        logId:log?.id??null,aircraftId:log?.aircraftId??null,aircraftName:log?state.aircraft.find(aircraft=>aircraft.id===log.aircraftId)?.name??null:null};
     });
     return {id:scan.id,folder:scan.folder,includeSubfolders:scan.includeSubfolders,scannedAt:scan.scannedAt,expiresAt:new Date(scan.expiresMs).toISOString(),complete:scan.complete,warnings:[...scan.warnings],skipped:{...scan.skipped},files,
-      summary:{newOriginals:newHashes.size,alreadyImportedFiles:files.filter(file=>file.logId).length,extraCopies:files.filter(file=>file.duplicateOf).length,unassignedImports:unassigned.size,airdataToReview:review.size,uncertainSubmissions:uncertain.size,blockedFiles:files.filter(file=>file.error).length}};
+      summary:{newOriginals:newHashes.size,alreadyImportedFiles:files.filter(file=>file.logId).length,extraCopies:files.filter(file=>file.duplicateOf).length,unassignedImports:unassigned.size,blockedFiles:files.filter(file=>file.error).length}};
   }
   return {
     getSettings:async()=>settings(),

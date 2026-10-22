@@ -51,20 +51,8 @@ export async function runFilingJourney({page,expect,baseURL,folder,screenshotDir
   await request('/api/flight-logs/'+unassigned.id,{aircraftId:aircraft.id},'PATCH');
   await page.getByRole('button',{name:'Refresh saved statuses',exact:true}).click();
   await expect(rows).toHaveCount(2);
-  await page.getByLabel('Filter folder review').selectOption('airdata');
-  await expect(rows).toHaveCount(1); // JSON/Remote ID archives are not eligible for sending.
-  await expect(rows.getByRole('heading',{name:'f-eligible.ulg',exact:true})).toBeVisible();
-  const eligible=after.flightLogs.find(log=>log.filename==='f-eligible.ulg');
-  await request('/api/flight-logs/'+eligible.id,{airdataStatus:'not-uploaded'},'PATCH');
-  await page.getByRole('button',{name:'Refresh saved statuses',exact:true}).click();
-  await page.getByLabel('Filter folder review').selectOption('needs-send');
-  await expect(rows).toHaveCount(1);
-  await request('/api/flight-logs/'+eligible.id,{airdataStatus:'uploaded'},'PATCH');
-  await page.getByRole('button',{name:'Refresh saved statuses',exact:true}).click();
-  await expect(rows).toHaveCount(0);
-  await page.getByLabel('Filter folder review').selectOption('confirmed');
-  await expect(rows).toHaveCount(1);
-  await expect(rows).not.toContainText('null');
+  await expect(page.getByLabel('Filter folder review').locator('option')).toHaveText(['All reviewed files','New originals','Already imported','Extra copies','Unassigned imports','Blocked files']);
+  await expect(page.locator('#filing-review')).not.toContainText('AirData');
   await writeFile(join(folder,'late.ridlog'),'arrived after the snapshot');
   await page.reload();
   await page.getByRole('button',{name:/Flight log library/}).click();
@@ -98,8 +86,8 @@ export async function runFilingJourney({page,expect,baseURL,folder,screenshotDir
   await page.route(deniedUrl,async route=>{
     if(route.request().method()!=='GET')return route.continue();
     const response=await route.fetch(),report=await response.json();
-    report.files=[{id:'blocked',relativePath:'synthetic-denied.txt',byteLength:1,modifiedAt:null,error:'Folder access was denied. Allow the background Node process access to this folder in macOS Privacy & Security, then scan again.',importable:false,logId:null,airdata:null}];
-    report.summary={newOriginals:0,alreadyImportedFiles:0,extraCopies:0,unassignedImports:0,airdataToReview:0,uncertainSubmissions:0,blockedFiles:1};
+    report.files=[{id:'blocked',relativePath:'synthetic-denied.txt',byteLength:1,modifiedAt:null,error:'Folder access was denied. Allow the background Node process access to this folder in macOS Privacy & Security, then scan again.',importable:false,logId:null}];
+    report.summary={newOriginals:0,alreadyImportedFiles:0,extraCopies:0,unassignedImports:0,blockedFiles:1};
     await route.fulfill({response,json:report});
   });
   await page.getByRole('button',{name:'Refresh saved statuses',exact:true}).click();
@@ -108,5 +96,5 @@ export async function runFilingJourney({page,expect,baseURL,folder,screenshotDir
   await page.unroute(deniedUrl);
   expect(provider.calls).toHaveLength(beforeAi);expect(airdata.calls).toHaveLength(beforeAirdata);
   expect(errors).toEqual([]);page.off('pageerror',onError);
-  return {errors,passed:['no automatic scan','scan leaves catalog unchanged','renamed existing original','extra copy excluded from selection','new-only selection','partial import retains successes','serial routing','unknown identity remains unassigned','refresh assignment without rescan','unsupported AirData formats excluded','manual AirData marks update review queue','reload retains snapshot without scanning','explicit rescan discovers later file','bulk import splits into bounded batches','blocked permission warning','mobile overflow','source bytes unchanged','folder excluded from export','no provider calls']};
+  return {errors,passed:['no automatic scan','scan leaves catalog unchanged','renamed existing original','extra copy excluded from selection','new-only selection','partial import retains successes','serial routing','unknown identity remains unassigned','refresh assignment without rescan','no upload queue in folder review','reload retains snapshot without scanning','explicit rescan discovers later file','bulk import splits into bounded batches','blocked permission warning','mobile overflow','source bytes unchanged','folder excluded from export','no provider calls']};
 }

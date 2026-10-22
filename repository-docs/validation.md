@@ -30,7 +30,15 @@ node dev/verify-bulk-airdata.mjs
 
 These explicit proofs exercise actual SQLite and worker/WASM behavior; their temporary directories are removed.
 
-## Observed v0.7.2 results — 2026-10-15
+## Observed AirData deferral results — 2026-10-22
+
+- ESLint and all 198 Jest tests passed across 22 suites. HTTP checks reject every deferred AirData route without constructing the service; local imports, dedupe, manual mark/reset, assignment, telemetry, original downloads and complete backup validation preserve historical receipts and exclude credentials.
+- The full Chromium journey passed 132 checks with synthetic memory repositories, including optional controls initially off, manual marks and filter selection, hiding tracking without losing marks, reload, historical receipt display without a connection, local folder review and responsive layouts. It recorded zero AirData API requests and seven fake OpenAI requests. No automated check opened a database or used personal records.
+- Separate disposable SQLite operational proofs passed via `node dev/verify-import-filing.mjs` and `node dev/verify-bulk-airdata.mjs`: local scans, exact originals, notes, setup/session history, manual marks and historical receipts survive restart and complete restore.
+- MCP_DOCKER Chromium confirmed the simplified library, manual tracking initially off and absent upload controls. Its connection closed during the follow-up check; the complete local Chromium runner passed afterward. Local browser reproduction used the existing executable through `FPVBENCH_CHROMIUM` because the package-default executable was absent.
+- No schema migration or credentials change is required. The standalone dormant upload service retains synthetic unit coverage. Historical results below describe earlier versions with active upload routes.
+
+## Historical v0.7.2 results — 2026-10-15
 
 - ESLint and all 197 Jest tests passed across twenty-two suites. The full synthetic browser run passed 135 checks.
 - The Not uploaded filter now includes unmarked defaults and explicit not-uploaded marks. Browser checks verify default labels, mixed-default/marked bulk selection, exclusion of current processing/confirmed submissions and removal after manual marking. Existing receipt and failure paths remain covered.
@@ -146,4 +154,4 @@ Parser coverage includes Betaflight profile namespaces, sparse omissions, select
 
 Representative real files establish those records' local summary parsing; their exact originating controller/model/firmware combinations were not independently established. No claim is made for every RC, RC2, or Goggles N3 export variant. Version 14 telemetry remains encrypted and unavailable in this version. DAT remains unsupported; unrecognized accepted originals have archive-only status.
 
-Manual AirData status is separate from the optional provider receipt. A confirmed receipt establishes only the recorded submission processing result, not historical account reconciliation. No external upload, DJI keychain request, live hardware connection, controller restoration/deployment, or flight-performance validation occurred. This is single-workstation software; evidence does not establish authenticated internet hosting or multi-user support.
+Manual upload status is separate from historical provider receipts. AirData integration is currently deferred; standalone service tests and the intake proof exercise dormant code with a fake transport. A confirmed receipt establishes only the recorded submission processing result, not historical account reconciliation. No external upload, DJI keychain request, live hardware connection, controller restoration/deployment, or flight-performance validation occurred. This is single-workstation software; evidence does not establish authenticated internet hosting or multi-user support.

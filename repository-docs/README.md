@@ -4,10 +4,11 @@
 - [macOS startup](macos-startup.md): login service, clickable controls, updates, and removal.
 - [Betaflight imports](betaflight-imports.md): prepare exports and interpret their limits.
 - [Flight log imports](dji-flight-imports.md): DJI decoding, broader original archives, assignment, and format limits.
-- [Import filing](import-filing.md): scan a copied-record folder, review duplicates and follow-up, and import selected new originals.
-- [AirData uploads](airdata.md): optional connection, selected original uploads, and processing receipts.
+- [Import filing](import-filing.md): scan a copied-record folder, review duplicates and assignments, and import selected new originals.
+- [Manual upload tracking and deferred AirData integration](airdata.md): optional local marks and historical receipts.
 - [Change journal and next-session brief](change-journal.md): per-aircraft memory, open next steps, and recorded context.
 - [Optional AI](optional-ai.md): setup assistant, recap, API key, allowance, and privacy.
+- [AirData deferral scope](scope-airdata-pause.md): authorized behavior, preservation requirements, and validation/documentation plan.
 - [v0.3 scope](scope-v0.3.md): optional OpenAI integration contract.
 - [Storage and backups](storage-and-backups.md): SQLite migration, complete exports, and local restore.
 - [Architecture](architecture.md): modules, persistence, comparison semantics, and boundaries.

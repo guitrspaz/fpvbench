@@ -21,17 +21,16 @@ export async function runBulkAirdataJourney({page,expect,baseURL,folder,screensh
   }
   await request('/api/flight-logs/'+created[0].id,{airdataStatus:'uploaded'},'PATCH');
   await request('/api/flight-logs/'+created[1].id,{airdataStatus:'not-uploaded'},'PATCH');
-  // Keep the connection identity/receipt, but remove the developer key to prove offline availability.
-  await request('/api/airdata/settings',{appKey:null},'PATCH');
   const scan=await request('/api/filing/scan',{});
   const before=await(await page.request.get(baseURL+'/api/export')).json();
   await page.reload();await page.getByLabel('Fleet status filter',{exact:true}).selectOption('all');
   await page.getByLabel('Selected aircraft').selectOption(aircraft.id);
   await page.getByRole('button',{name:'Flight log library',exact:true}).click();
   await page.getByLabel('Filter aircraft assignment').selectOption('selected');
+  await page.getByLabel('Show manual upload tracking',{exact:true}).check();
   await page.getByRole('button',{name:'Select all matching',exact:true}).click();
   await expect(page.getByText('27 selected',{exact:true})).toBeVisible();
-  await page.getByLabel('Filter AirData upload status').selectOption('not-uploaded');
+  await page.getByLabel('Filter manual upload status').selectOption('unknown');
   await expect(page.getByText('0 selected',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Mark selected as uploaded',exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'Select all matching',exact:true}).click();
@@ -39,28 +38,25 @@ export async function runBulkAirdataJourney({page,expect,baseURL,folder,screensh
   await page.getByRole('button',{name:'Clear selection',exact:true}).click();
   await expect(page.getByText('0 selected',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Select all matching',exact:true}).click();
-  await expect(page.getByRole('button',{name:'Send selected logs to AirData',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Send selected logs to AirData',exact:true})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Mark selected as uploaded',exact:true})).toBeEnabled();
   await page.getByRole('button',{name:'Mark selected as uploaded',exact:true}).click();
   await expect(page.getByText('25 marked as uploaded · 0 already marked. No files were sent.',{exact:true})).toBeVisible();
   const expected=structuredClone(before);
-  for(const log of expected.flightLogs)if(created.slice(1,26).some(item=>item.id===log.id))log.airdataStatus='uploaded';
+  for(const log of expected.flightLogs)if(created.slice(2,26).some(item=>item.id===log.id)||log.id===receiptLog.id)log.airdataStatus='uploaded';
   expect(await(await page.request.get(baseURL+'/api/export')).json()).toEqual(expected);
   const refreshed=await(await page.request.get(baseURL+'/api/filing/scan')).json();
-  expect(refreshed.id).toBe(scan.id);expect(refreshed.summary.airdataToReview).toBe(1);
-  await page.getByRole('button',{name:'Review flight-record folder',exact:true}).click();
-  await page.getByLabel('Filter folder review').selectOption('airdata');
-  await expect(page.locator('#filing-rows .filing-file')).toHaveCount(1);
-  await expect(page.locator('#filing-rows').getByRole('heading',{name:'bulk-synthetic-26.ulg',exact:true})).toBeVisible();
+  expect(refreshed.id).toBe(scan.id);expect(refreshed).toEqual(scan);
   await page.reload();await page.getByRole('button',{name:'Flight log library',exact:true}).click();
   await page.getByLabel('Filter aircraft assignment').selectOption('selected');
-  await page.getByLabel('Filter AirData upload status').selectOption('uploaded');
+  await page.getByLabel('Show manual upload tracking',{exact:true}).check();
+  await page.getByLabel('Filter manual upload status').selectOption('uploaded');
   await expect(page.getByText('26 of 27 flights',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Select all matching',exact:true}).click();
   await page.getByLabel('Filter aircraft assignment').selectOption('unassigned');
   await expect(page.getByText('0 selected',{exact:true})).toBeVisible();
   await page.getByLabel('Filter aircraft assignment').selectOption('all');
-  await page.getByLabel('Filter AirData upload status').selectOption('');
+  await page.getByLabel('Filter manual upload status').selectOption('');
   await page.getByLabel('Select bulk-synthetic-26.ulg',{exact:true}).check();
   await page.route(baseURL+'/api/flight-logs/mark-uploaded',route=>route.fulfill({status:500,json:{error:'Synthetic mark failure'}}));
   await page.getByRole('button',{name:'Mark selected as uploaded',exact:true}).click();
@@ -74,5 +70,5 @@ export async function runBulkAirdataJourney({page,expect,baseURL,folder,screensh
   if(screenshotDir)await page.screenshot({path:screenshotDir+'/bulk-marks-desktop.png'});
   expect(provider.calls).toHaveLength(aiCalls);expect(airdata.calls).toHaveLength(airdataCalls);
   expect(errors).toEqual([]);page.off('pageerror',onError);
-  return {errors,passed:['all matching respects aircraft and status filters','selection count and clearing','manual marks work without AirData key','more than twenty marked without sending','all other evidence and receipts preserved','folder review updates without rescan','marks survive reload','failed marking reports failure and leaves records unchanged','mobile overflow','no provider calls']};
+  return {errors,passed:['all matching respects aircraft and status filters','selection count and clearing','manual marks work without AirData key','more than twenty marked without sending','all other evidence and receipts preserved','folder review independent of manual marks','marks survive reload','failed marking reports failure and leaves records unchanged','mobile overflow','no provider calls']};
 }

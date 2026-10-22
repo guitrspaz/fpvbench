@@ -17,14 +17,15 @@ beforeEach(async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base='http://127.0.0.1:'+server.address().port;
 });
 afterEach(async()=>{await new Promise(resolve=>server.close(resolve));await rm(root,{recursive:true,force:true});});
-test('manual bulk endpoint works without credentials and clears folder review without rescanning',async()=>{
+test('manual bulk endpoint works without credentials and preserves local folder review without rescanning',async()=>{
  const scan=await(await request('/api/filing/scan',{})).json();
  const imported=await(await request('/api/filing/import',{scanId:scan.id,fileIds:[scan.files[0].id]})).json();
- const id=imported.results[0].logId;expect(imported.scan.summary.airdataToReview).toBe(1);
+ const id=imported.results[0].logId;expect(imported.scan.summary.alreadyImportedFiles).toBe(1);
  const response=await request('/api/flight-logs/mark-uploaded',{ids:[id]});expect(response.status).toBe(200);
  expect(await response.json()).toEqual({selected:1,updated:1,alreadyUploaded:0});
- const refreshed=await(await fetch(base+'/api/filing/scan')).json();expect(refreshed.id).toBe(scan.id);expect(refreshed.summary.airdataToReview).toBe(0);expect(refreshed.files[0].airdata.state).toBe('manual-sent');
- expect((await(await fetch(base+'/api/airdata/settings')).json()).available).toBe(false);expect(fetchImpl).not.toHaveBeenCalled();
+ const refreshed=await(await fetch(base+'/api/filing/scan')).json();expect(refreshed.id).toBe(scan.id);expect(refreshed).toEqual(imported.scan);
+ expect((await(await fetch(base+'/api/state')).json()).flightLogs[0].airdataStatus).toBe('uploaded');
+ expect((await fetch(base+'/api/airdata/settings')).status).toBe(410);expect(fetchImpl).not.toHaveBeenCalled();
 });
 test('origin, JSON body, bounded input and fields are checked before any mark',async()=>{
  expect((await request('/api/flight-logs/mark-uploaded',{ids:[]}, {Origin:'https://foreign.example'})).status).toBe(403);

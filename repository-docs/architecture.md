@@ -2,9 +2,9 @@
 
 ## Local application
 
-FPVBench v0.7 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI and AirData requests use server-side fetch.
+FPVBench v0.7 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI requests use server-side fetch. AirData integration is deferred; the server never constructs its service.
 
-The interface calls JSON endpoints for aircraft, setup imports/comparison, sessions, and flight-log records. Browser local storage remembers aircraft/fleet selection and display units; the server owns the data.
+The interface calls JSON endpoints for aircraft, setup imports/comparison, sessions, and flight-log records. Browser local storage remembers aircraft/fleet selection, display units and the optional manual-upload-tracking preference; the server owns the data.
 
 ## Modules
 
@@ -20,8 +20,8 @@ The interface calls JSON endpoints for aircraft, setup imports/comparison, sessi
 | `src/sqlite-repository.mjs` | Prepared SQLite persistence and telemetry pagination. |
 | `src/log-import.mjs` | Recognize content and retain broader originals without inventing flight evidence. |
 | `src/import-filing.mjs` | Scan local source folders, classify exact originals against the catalog, and recheck selected files before import. |
-| `src/airdata.mjs` | Hold private credentials, verify the connection, send selected originals and poll recorded jobs. |
-| `src/airdata-transfer.mjs` | Validate receipts and identify upload-eligible formats. |
+| `src/airdata.mjs` | Dormant upload implementation retained for future reassessment; never initialized by the application server. |
+| `src/airdata-transfer.mjs` | Validate preserved receipts; retain dormant upload-format constants. |
 | `src/dji-import.mjs` | Bound decoding requests and validate/normalize DJI evidence. |
 | `src/dji-worker.mjs` | Isolate file decoding from the HTTP event loop. |
 | `src/ai-service.mjs` | Gate optional OpenAI requests, reserve local allowance, validate output, and cache reports. |
@@ -64,11 +64,11 @@ Credentials, ledger, and bounded report cache live in `.ai-config.json`, `.ai-st
 
 Setup input contains only allowlisted explicit values and filtered baseline context. Flight summaries are calculated locally before being explained. Reports are advisory and never apply controller settings. Server calls the fixed OpenAI Responses endpoint with store:false, no tools, and bounded structured output. The browser calls only local APIs. See [optional AI](optional-ai.md).
 
-## Optional AirData
+## Deferred AirData integration
 
-Credentials live in owner-private `.airdata-config.json` and are excluded from exports. Saving settings makes no network call. Explicit connection verification gates selected uploads. Returned upload destinations must match bounded HTTPS AirData hosts; redirects are refused and responses/timeouts are bounded. Uploading uses each immutable original.
+All `/api/airdata` routes return HTTP 410. The application server neither constructs the upload service nor reads its configuration, even when existing credentials are present. The browser has no upload settings, send/refresh actions or AirData API requests. No runtime opt-in restores these routes.
 
-A submitting receipt is persisted before transmitting the file. An interrupted submission stays uncertain and is skipped by subsequent send requests. Known job polling updates the receipt without resending. Manual upload marks and provider processing results are distinct. Token changes isolate current receipts; only the latest attempt is retained. Archive records provide no decoded flight measurements, automatic sessions or AI flight totals. See [AirData uploads](airdata.md).
+Manual upload fields and historical receipts remain independent catalog evidence, preserved by deduplication, export and restore. Historical receipts display without a current connection identity and are explicitly unrefreshed. Existing credential files stay untouched and excluded from exports. The standalone service remains covered by synthetic unit tests for future reassessment. See [manual tracking and deferral](airdata.md).
 
 ## Validation seams
 
@@ -82,15 +82,15 @@ Jest, Playwright, and ESLint are development dependencies. The `@istanbuljs/load
 
 Imported flight records can have a null aircraft relationship in catalog/SQLite version 3. Aircraft and sessions still require actual fleet identities. Serial matching uses only aircraft serials and explicit aliases; controller identity, labels and selection do not route mixed imports. Unassigned records retain original/telemetry evidence without a session until assignment. Assignment, alias learning and session creation/update commit together. Explicit batch rematching only changes unassigned records. Reassignment clears the old aircraft’s setup link and confirmation while retaining session observations. Exact-byte dedupe spans all aircraft and the inbox. Existing v2 SQLite is backed up before its transactional nullable-flight relationship migration; complete v2 JSON exports remain restorable.
 
-## Bulk manual AirData marks
+## Optional manual upload marks
 
 `POST /api/flight-logs/mark-uploaded` accepts only explicit record IDs, with a 64 KiB request body and up to 1,000 IDs. The store deduplicates and resolves every ID before changing manual upload status, validates the records, and saves one serialized transaction per batch. Invalid IDs or a save failure leave the entire batch unchanged. Provider receipts and all other evidence remain intact; no provider service is called.
 
-The library selects records using its aircraft and AirData filters and clears selection when either changes. Manual marking works without credentials. Larger selections use sequential batches of 1,000 and retain successful earlier batches after a later failure. The existing send/refresh limit remains twenty. Folder review derives its queue from the updated catalog without a new filesystem scan.
+Manual tracking starts off and is enabled with a browser-local checkbox. Its aircraft and manual-status filters determine selection; changing either clears selection. Turning tracking off hides controls and badges without altering saved marks. Unknown means Not recorded rather than not uploaded. Individual status editing and historical receipts use collapsed sections. Larger selections use sequential batches of 1,000 and retain successful earlier batches after a later failure. Folder review has no upload queue.
 
 ## Import filing
 
-The filing service saves a folder preference in owner-private `.filing-config.json`; the latest bounded scan remains in memory. Explicit scans hash eligible files without decoding or importing. SHA-256 links renamed copies to existing originals. Reports derive current assignment and account-scoped upload evidence from the catalog without provider requests.
+The filing service saves a folder preference in owner-private `.filing-config.json`; the latest bounded scan remains in memory. Explicit scans hash eligible files without decoding or importing. SHA-256 links renamed copies to existing originals. Reports derive current assignments and import states from the local catalog, without reading provider settings or deriving upload queues.
 
 `GET/PATCH /api/filing/settings` reads or saves the location. `GET /api/filing/scan` reads the latest report; `POST` starts a scan. `POST /api/filing/import` accepts one scan ID and up to twenty opaque file IDs, never client-supplied file paths. A scan expires after thirty minutes, on restart, or on a settings change. Concurrent filing mutations are rejected while an operation is active; close waits for it to finish.
 

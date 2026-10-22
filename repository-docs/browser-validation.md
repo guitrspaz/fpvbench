@@ -22,7 +22,15 @@ FPVBENCH_SCREENSHOT_DIR=/absolute/local/screenshot-directory npm run test:browse
 
 The runner also accepts --screenshot-dir=/absolute/local/directory as a command-line argument. Screenshots contain synthetic test data and are not added to the repository automatically.
 
-## Observed result — v0.7.2, 2026-10-15
+## Observed result — AirData deferral, 2026-10-22
+
+The full synthetic Chromium run passed 132 checks with memory repositories, zero AirData API requests and seven fake OpenAI calls. Manual tracking defaults off; individual marks can be changed or cleared, bulk selection respects aircraft and manual-status filters, and disabling tracking hides controls without losing marks. Reload, historical receipts without a connection, local filing, preserved complete exports, failure reporting and mobile layouts passed. No personal workspace or database was used.
+
+MCP_DOCKER Chromium separately confirmed the simplified library, default-off tracking and absent upload buttons. Its connection closed during further checks; the complete local Chromium journey passed afterward. The local run used an existing compatible browser executable via `FPVBENCH_CHROMIUM`; no browser download was needed.
+
+Desktop and mobile screenshots were captured with synthetic records, and the mobile bulk-marking screenshot was inspected. Earlier results below describe the historical upload-enabled interface.
+
+## Historical result — v0.7.2, 2026-10-15
 
 The complete synthetic run passed 135 checks. New assertions verify that unmarked originals appear as **Not uploaded (default)** in the primary **Not uploaded** filter, while processing and confirmed submissions are excluded. The bulk-marking journey now selects a mixture of defaults and explicit not-uploaded marks, preserves other evidence, and removes marked records from the review queue.
 

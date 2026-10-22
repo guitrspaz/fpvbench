@@ -91,20 +91,23 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   response = await page.request.get(new URL(rawPath, baseURL).href);
   expect(response.status()).toBe(200);
   expect(await response.body()).toEqual(decodedBytes);
-  await expect(content.getByLabel('AirData upload status', { exact: true })).toHaveValue('unknown');
-  await content.getByLabel('AirData upload status', { exact: true }).selectOption('uploaded');
-  await content.getByRole('button', { name: 'Save AirData status', exact: true }).click();
-  await expect(page.getByText('AirData status saved.', { exact: true })).toBeVisible();
-  await expect(content.getByLabel('AirData upload status', { exact: true })).toBeEnabled();
-  await expect(content.getByLabel('AirData upload status', { exact: true })).toHaveValue('uploaded');
+  await content.getByText('Manual upload tracking (optional)', { exact: true }).click();
+  await expect(content.getByLabel('Manual upload status', { exact: true })).toHaveValue('unknown');
+  await content.getByLabel('Manual upload status', { exact: true }).selectOption('uploaded');
+  await content.getByRole('button', { name: 'Save manual upload status', exact: true }).click();
+  await expect(page.getByText('Manual upload status saved.', { exact: true })).toBeVisible();
+  await content.getByText('Manual upload tracking (optional)', { exact: true }).click();
+  await expect(content.getByLabel('Manual upload status', { exact: true })).toBeEnabled();
+  await expect(content.getByLabel('Manual upload status', { exact: true })).toHaveValue('uploaded');
   await content.getByRole('button', { name: '← All DJI imports', exact: true }).click();
-  await content.getByLabel('Filter AirData upload status', { exact: true }).selectOption('uploaded');
+  await content.getByLabel('Show manual upload tracking', { exact: true }).check();
+  await content.getByLabel('Filter manual upload status', { exact: true }).selectOption('uploaded');
   await expect(content.getByRole('button', { name: 'decoded-smoke.json', exact: true })).toBeVisible();
   await expect(content.getByRole('button', { name: 'summary-smoke.json', exact: true })).toHaveCount(0);
-  await content.getByLabel('Filter AirData upload status', { exact: true }).selectOption('not-uploaded');
+  await content.getByLabel('Filter manual upload status', { exact: true }).selectOption('unknown');
   await expect(content.getByRole('button', { name: 'summary-smoke.json', exact: true })).toBeVisible();
   await expect(content.getByRole('button', { name: 'decoded-smoke.json', exact: true })).toHaveCount(0);
-  await content.getByLabel('Filter AirData upload status', { exact: true }).selectOption('');
+  await content.getByLabel('Filter manual upload status', { exact: true }).selectOption('');
   await content.getByRole('button', { name: 'decoded-smoke.json', exact: true }).click();
   await expect(content.getByText('1–100 of 101 frames', { exact: true })).toBeVisible();
   if (screenshotDir) {
@@ -153,7 +156,8 @@ export async function runDjiJourney({ page, expect, baseURL, screenshotDir }) {
   }
   await content.getByRole('button', { name: 'decoded-smoke.json', exact: true }).click();
   await expect(content.getByText('1–100 of 101 frames', { exact: true })).toBeVisible();
-  await expect(content.getByLabel('AirData upload status', { exact: true })).toHaveValue('uploaded');
+  await content.getByText('Manual upload tracking (optional)', { exact: true }).click();
+  await expect(content.getByLabel('Manual upload status', { exact: true })).toHaveValue('uploaded');
   expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth + 1)).toBe(true);
   if (screenshotDir) {
     await page.evaluate(() => globalThis.scrollTo(0, 0));

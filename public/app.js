@@ -21,7 +21,7 @@ let importFilename = "pasted-export.txt";
 let originalFileText = null;
 let noticeTimer;
 let aiSettings = { available: false };
-let airdataSettings = { available: false };
+let manualUploadTracking = localStorage.getItem("fpvbench.manualUploadTracking") === "true";
 let journalFilter="all";
 let journalEditing=null;
 let filingChosen=new Set(),filingScanId=null,filingResults=[],filingFilter="all";
@@ -114,7 +114,7 @@ function notify(message, error = false) {
 }
 
 async function refresh() {
-  [state] = await Promise.all([api("/api/state"), readAiSettings(), readAirdataSettings()]);
+  [state] = await Promise.all([api("/api/state"), readAiSettings()]);
   const visible = visibleAircraft();
   if (!visible.some(aircraft => aircraft.id === aircraftId)) aircraftId = visible[0]?.id || "";
   $("#fleet-status-filter").value = fleetStatus;
@@ -1050,40 +1050,6 @@ function outcomeBadge(outcome) {
   );
 }
 
-async function readAirdataSettings() {
-  try { airdataSettings = await api("/api/airdata/settings"); }
-  catch { airdataSettings = { available: false, reason: "AirData settings are unavailable." }; }
-  return airdataSettings;
-}
-
-function airdataSettingsPanel() {
-  const panel = element("section", { class: "panel" }, panelHeading("AirData connection", "Send selected original logs to your AirData account. Saving credentials makes no network call."));
-  const form = element("form", { id: "airdata-settings-form" });
-  const token = element("input", { type: "password", "aria-label": "AirData user upload token", autocomplete: "off", placeholder: airdataSettings.userTokenConfigured ? "Configured · leave blank to keep" : "Your HD upload token" });
-  const key = element("input", { type: "password", "aria-label": "AirData developer application key", autocomplete: "off", placeholder: airdataSettings.appKeyConfigured ? "Configured · leave blank to keep" : "Developer upload application key" });
-  const save = element("button", { type: "submit", class: "primary", text: "Save AirData settings" });
-  form.append(element("label", {}, "AirData user upload token", token), element("label", {}, "AirData developer application key", key));
-  form.addEventListener("submit", async event => {
-    event.preventDefault(); save.disabled = true;
-    const payload = {}; if (token.value.trim()) payload.userToken = token.value.trim(); if (key.value.trim()) payload.appKey = key.value.trim();
-    try { await api("/api/airdata/settings", payload, "PATCH"); token.value = ""; key.value = ""; await readAirdataSettings(); notify("AirData credentials saved privately."); await render(); }
-    catch (error) { notify(error.message, true); save.disabled = false; }
-  });
-  const check = button("Check AirData connection", async event => {
-    event.currentTarget.disabled = true;
-    try { await api("/api/airdata/check", {}); notify("AirData upload connection verified."); } catch (error) { notify(error.message, true); }
-    await readAirdataSettings(); await render();
-  });
-  check.disabled = !airdataSettings.userTokenConfigured || !airdataSettings.appKeyConfigured;
-  const remove = button("Remove AirData credentials", async () => {
-    try { await api("/api/airdata/settings", { appKey: null, userToken: null }, "PATCH"); await readAirdataSettings(); notify("AirData credentials removed."); await render(); } catch (error) { notify(error.message, true); }
-  });
-  form.append(element("div", { class: "form-actions" }, save, check, remove));
-  panel.append(form, element("p", { id: "airdata-connection-reason", class: "form-help", text: airdataSettings.reason || "Configure both upload credentials." }),
-    element("p", { class: "form-help", text: "The upload application key is issued to app developers by AirData; it is different from an Enterprise read API key. Your user token alone cannot list historical uploads. Sending includes the original log contents, which can contain locations and device identifiers. Files leave this computer only when you explicitly send them." }));
-  return panel;
-}
-
 async function readAiSettings() {
   try { aiSettings = await api("/api/ai/settings"); }
   catch { aiSettings = { available: false, reason: "Optional AI settings are unavailable. The offline workbench remains usable." }; }
@@ -1192,7 +1158,7 @@ function showSettings() {
     check,
     element("p", { class: "form-help", text: `Model: ${settings.model || "Not available"}${settings.priceCheckedAt ? ` · Pricing checked ${settings.priceCheckedAt}` : ""}. Checks and analyses use the configured monthly allowance.` }));
   panel.append(form);
-  content.replaceChildren(display, airdataSettingsPanel(), panel, status);
+  content.replaceChildren(display, panel, status);
 }
 
 function aiReportContent(envelope) {
@@ -1435,24 +1401,15 @@ function flightStatus(log) {
   return badge(log.status === "archived" ? "ARCHIVED ORIGINAL" : log.status === "decoded" ? "DECODED" : "SUMMARY ONLY", log.status === "decoded" ? "green" : "amber");
 }
 
-const airdataLabels = { unknown: "Not uploaded (default)", "not-uploaded": "Not uploaded (marked)", uploaded: "Uploaded" };
-
-function transferFor(log) { return log.airdataTransfer?.accountId === airdataSettings.accountId ? log.airdataTransfer : null; }
-function uploadState(log) {
-  const receipt = transferFor(log);
-  return receipt ? (receipt.status === "submitting" ? "unknown" : receipt.status === "preparing" ? "error" : receipt.status) : log.airdataStatus === "uploaded" ? "manual-sent" : log.airdataStatus === "not-uploaded" ? "needs-send" : "unconfirmed";
+const airdataLabels = { unknown: "Not recorded", "not-uploaded": "Manually marked not uploaded", uploaded: "Manually marked uploaded" };
+const transferLabels = { success: "Processing succeeded", pending: "Processing was pending", running: "Processing was running", unknown: "Submission outcome unknown", submitting: "Submission outcome unknown", preparing: "Upload preparation incomplete", error: "Upload failed" };
+function manualUploadBadge(log) {
+  if (!manualUploadTracking || !log.airdataStatus || log.airdataStatus === "unknown") return null;
+  return badge(airdataLabels[log.airdataStatus], log.airdataStatus === "uploaded" ? "green" : "");
 }
-const transferLabels = { success: "Confirmed by AirData", pending: "Processing", running: "Processing", unknown: "Submission outcome unknown", error: "Upload failed", "manual-sent": "Manually marked sent", "needs-send": "Marked needs sending", unconfirmed: "Not uploaded (default)" };
-function airdataBadge(log) {
-  const receipt = transferFor(log);
-  if (receipt) return badge("AirData: " + transferLabels[uploadState(log)], receipt.status === "success" ? "green" : "amber");
-  const status = log.airdataStatus || "unknown";
-  return badge(`AirData: ${airdataLabels[status] || airdataLabels.unknown}`, status === "uploaded" ? "green" : "");
-}
-
 
 function filingEntryPanel() {
-  return element("section",{class:"panel"},panelHeading("Import filing","Review a local flight-record folder for new originals, duplicates, assignment, and AirData follow-up.",
+  return element("section",{class:"panel"},panelHeading("Import filing","Review a local flight-record folder for new originals, duplicates, and aircraft assignment.",
     button("Review flight-record folder",()=>navigate("filing"),"primary")));
 }
 
@@ -1473,7 +1430,7 @@ async function showFiling(revision) {
     const status=element("p",{role:"status","aria-live":"polite",class:"filing-progress"});
     const results=element("section",{class:"panel filing-results",id:"filing-review"});
     const filter=element("select",{"aria-label":"Filter folder review"});
-    for(const [value,text] of [["all","All reviewed files"],["new","New originals"],["imported","Already imported"],["duplicates","Extra copies"],["unassigned","Unassigned imports"],["airdata","AirData to review"],["needs-send","Marked needs sending"],["unconfirmed","Not uploaded (default)"],["processing","Processing in AirData"],["confirmed","Confirmed or manually marked sent"],["uncertain","Submission outcome unknown"],["blocked","Blocked files"]])filter.append(element("option",{value,text}));
+    for(const [value,text] of [["all","All reviewed files"],["new","New originals"],["imported","Already imported"],["duplicates","Extra copies"],["unassigned","Unassigned imports"],["blocked","Blocked files"]])filter.append(element("option",{value,text}));
     filter.value=filingFilter;
     const source=element("input",{type:"text",name:"sourceDevice",maxlength:"200",placeholder:"Optional; does not determine the aircraft"});
     const importButton=button("Import selected files",async()=>{
@@ -1512,21 +1469,15 @@ async function showFiling(revision) {
     const controls=element("div",{class:"toolbar filing-controls"},filter,selectNew,clear,refreshReview);
     results.append(panelHeading("Folder review","Counts apply to this folder snapshot. Import and assignment statuses are read from the current library."),
       summary,counts,controls,element("label",{},"Source device (optional)",source),element("div",{class:"toolbar"},importButton,selection),status,rows,pager,history,
-      element("p",{class:"proof-note",text:"Unmarked imports default to Not uploaded. AirData to review includes eligible defaults, records marked needs sending, and failed uploads. This is an upload to-do list; records may already exist in AirData. Pending, confirmed, and uncertain submissions are kept separate."}),
       button("Open flight log library →",()=>navigate("flights"),"text-button"));
     function filtered() {
       return (report?.files??[]).filter(file=>{
-        const upload=file.airdata;
         return filingFilter==="all"||(
           filingFilter==="new"?file.importable:
           filingFilter==="imported"?Boolean(file.logId):
           filingFilter==="duplicates"?Boolean(file.duplicateOf):
           filingFilter==="unassigned"?file.logId&&file.aircraftId===null:
-          filingFilter==="airdata"?upload?.needsReview:
-          filingFilter==="processing"?["pending","running"].includes(upload?.state):
-          filingFilter==="confirmed"?["success","manual-sent"].includes(upload?.state):
-          filingFilter==="uncertain"?upload?.state==="unknown":
-          filingFilter==="blocked"?Boolean(file.error):upload?.state===filingFilter);
+          filingFilter==="blocked"?Boolean(file.error):false);
       });
     }
     function setWorking(value) {
@@ -1546,11 +1497,6 @@ async function showFiling(revision) {
           element("p",{class:"item-meta",text:`${metric(file.byteLength/1024,"KiB")} · ${file.modifiedAt?date(file.modifiedAt,true):"Modification date unavailable"}`}),
           element("p",{text:file.logId?`Aircraft: ${file.aircraftName??"Unassigned"}`:"Aircraft: determined when imported; unknown identities remain unassigned."}));
         if(file.duplicateOf)item.append(element("p",{class:"form-help",text:`Same original bytes as ${file.duplicateOf}.`}));
-        if(file.airdata){
-          item.append(badge("AirData: "+(transferLabels[file.airdata.state]??"Not confirmed"),file.airdata.state==="success"?"green":""));
-          if(!file.airdata.eligible)item.append(element("p",{class:"form-help",text:"This retained format is not enabled for AirData sending."}));
-        }
-        else item.append(element("p",{class:"form-help",text:"AirData status is available after import."}));
         if(file.error)item.append(element("p",{class:"form-error",text:file.error}));
         if(file.logId)item.append(element("div",{},button("Open imported record",async()=>{try{await refresh();if(currentView==="filing")viewFlight(file.logId);}catch(error){notify(error.message,true);}},"text-button")));
         return item;
@@ -1565,15 +1511,14 @@ async function showFiling(revision) {
       counts.replaceChildren();summary.replaceChildren();history.replaceChildren();
       if(report) {
         const s=report.summary;
-        for(const [label,value,note] of [["New originals",s.newOriginals,"Unique original bytes"],["Already imported",s.alreadyImportedFiles,"Files matching the library"],["Extra copies",s.extraCopies,"Additional copies in this scan"],["Unassigned imports",s.unassignedImports,"Unique imported records"],["AirData to review",s.airdataToReview,"Unique eligible imports"]])counts.append(stat(label,value,note));
+        for(const [label,value,note] of [["New originals",s.newOriginals,"Unique original bytes"],["Already imported",s.alreadyImportedFiles,"Files matching the library"],["Extra copies",s.extraCopies,"Additional copies in this scan"],["Unassigned imports",s.unassignedImports,"Unique imported records"]])counts.append(stat(label,value,note));
         if(s.blockedFiles)counts.append(stat("Blocked files",s.blockedFiles,"Could not read these originals"));
         summary.append(element("p",{class:"item-meta",text:`${report.complete?"Folder scan finished":"Partial folder scan"} · ${date(report.scannedAt,true)} · ${report.folder}`}),
-          element("p",{class:"form-help",text:`Import selection expires ${date(report.expiresAt,true)}. These counts overlap; duplicate files may also be unassigned or need review.`}));
+          element("p",{class:"form-help",text:`Import selection expires ${date(report.expiresAt,true)}. These counts overlap; duplicate files may also be unassigned or already imported.`}));
         if(report.warnings.length)summary.append(warningBox(report.warnings));
         if(report.files.some(file=>file.error?.startsWith("Folder access was denied.")))summary.append(element("p",{class:"warning-box",text:"Folder access was denied for some files. Allow the background Node process access in macOS Privacy & Security, then scan again, or choose an accessible source folder."}));
         const skipped=Object.entries(report.skipped).filter(([,value])=>value);
         if(skipped.length)summary.append(element("p",{class:"form-help",text:"Skipped: "+skipped.map(([key,value])=>`${value} ${key}`).join(" · ")}));
-        if(s.uncertainSubmissions)summary.append(element("p",{class:"warning-box",text:`${s.uncertainSubmissions} submissions have an unknown outcome. Check AirData before considering a resend.`}));
       }
       if(filingResults.length) {
         history.append(element("h3",{text:"Import results"}));
@@ -1604,7 +1549,7 @@ function showFlightLogs() {
   if (!(state.flightLogs || []).length) return content.replaceChildren(filingEntryPanel(),empty("Bring your flight records into the workbench",
     "Import copied DJI records and other log originals. Archive-only files stay out of flight statistics until their measurements can be decoded.",
     openFlightImport, "↑ Import flight logs"));
-  const panel = element("section", { class: "panel" }, panelHeading(`${logs.length} imported ${logs.some(log => log.status === "archived") ? "records" : logs.length === 1 ? "flight" : "flights"}`,
+  const panel = element("section", { class: "panel" }, panelHeading(`${logs.length} imported ${logs.some(log => log.status === "archived") ? (logs.length === 1 ? "record" : "records") : logs.length === 1 ? "flight" : "flights"}`,
     "Flight details remain separate from your editable session observations."));
   const scope = element("select", { "aria-label": "Filter aircraft assignment" },
     element("option", { value: "all", text: "All aircraft" }),
@@ -1612,17 +1557,22 @@ function showFlightLogs() {
     element("option", { value: "unassigned", text: `Unassigned (${state.flightLogs.filter(log => log.aircraftId === null).length})` }));
   scope.value = flightScope;
   scope.addEventListener("change", () => { flightScope = scope.value; showFlightLogs(); });
-  const filter = element("select", { "aria-label": "Filter AirData upload status", id: "airdata-status-filter" },
-    element("option", { value: "", text: "All AirData statuses" }),
-    element("option", { value: "not-uploaded", text: "Not uploaded" }),
-    element("option", { value: "uploaded", text: "Uploaded" }),
-    ...["success", "pending", "manual-sent", "needs-send", "unconfirmed", "error", "unknown-transfer"].map(value => element("option", { value: "transfer:" + value, text: value === "unknown-transfer" ? "Submission outcome unknown" : transferLabels[value] })));
+  const tracking = element("input", { type: "checkbox", id: "manual-upload-tracking" });
+  tracking.checked = manualUploadTracking;
+  tracking.addEventListener("change", () => {
+    manualUploadTracking = tracking.checked;
+    localStorage.setItem("fpvbench.manualUploadTracking", String(manualUploadTracking));
+    showFlightLogs();
+  });
+  const filter = element("select", { "aria-label": "Filter manual upload status", id: "manual-upload-status-filter" },
+    element("option", { value: "", text: "All manual statuses" }),
+    ...Object.entries(airdataLabels).map(([value, text]) => element("option", { value, text })));
   const chosen = new Set();
   let working = false;
   const selection = element("p", { class: "result-count", "aria-live": "polite" });
   const rows = element("div");
   const count = element("p", { class: "result-count" });
-  const matching = () => logs.filter(log => !filter.value || (filter.value === "not-uploaded" ? log.airdataStatus !== "uploaded" && ["unconfirmed", "needs-send", "error"].includes(uploadState(log)) : filter.value.startsWith("transfer:") ? uploadState(log) === filter.value.slice(9).replace("unknown-transfer", "unknown") || (filter.value === "transfer:pending" && uploadState(log) === "running") : log.airdataStatus === filter.value));
+  const matching = () => logs.filter(log => !manualUploadTracking || !filter.value || (log.airdataStatus || "unknown") === filter.value);
   const updateSelection = () => {
     selection.textContent = `${chosen.size} selected`;
     mark.disabled = working || !chosen.size;
@@ -1631,10 +1581,10 @@ function showFlightLogs() {
     const selected = matching();
     count.textContent = `${selected.length} of ${logs.length} flights`;
     rows.replaceChildren(...selected.map(log => element("div", { class: "item-row" },
-    element("div", {}, element("input", { type: "checkbox", "aria-label": "Select " + log.filename, checked: chosen.has(log.id) ? "" : null, disabled: working ? "" : null, onchange: event => { if (event.target.checked) chosen.add(log.id); else chosen.delete(log.id); updateSelection(); } }), button(log.filename, () => viewFlight(log.id), "item-title"),
+    element("div", {}, manualUploadTracking ? element("input", { type: "checkbox", "aria-label": "Select " + log.filename, checked: chosen.has(log.id) ? "" : null, disabled: working ? "" : null, onchange: event => { if (event.target.checked) chosen.add(log.id); else chosen.delete(log.id); updateSelection(); } }) : null, button(log.filename, () => viewFlight(log.id), "item-title"),
       element("p", { class: "item-meta", text: `${log.summary.startTime ? date(log.summary.startTime, true) : "Flight date unavailable"} · ${log.sourceDevice || "Source device not recorded"} · ${state.aircraft.find(aircraft => aircraft.id === log.aircraftId)?.name || "Unassigned"} · ${log.logVersion === null ? log.format : "Version " + log.logVersion}` })),
-    element("div", { class: "row-actions" }, log.aircraftId === null ? badge("UNASSIGNED", "amber") : null, flightStatus(log), airdataBadge(log), button("Inspect →", () => viewFlight(log.id), "text-button")))));
-    if (!selected.length) rows.append(element("p", { class: "muted", text: "No imports match this AirData status." }));
+    element("div", { class: "row-actions" }, log.aircraftId === null ? badge("UNASSIGNED", "amber") : null, flightStatus(log), manualUploadBadge(log), button("Inspect →", () => viewFlight(log.id), "text-button")))));
+    if (!selected.length) rows.append(element("p", { class: "muted", text: "No imports match this manual status." }));
     updateSelection();
   };
   filter.addEventListener("change", () => { chosen.clear(); update(); });
@@ -1646,17 +1596,6 @@ function showFlightLogs() {
     } catch (error) { notify(error.message, true); target.disabled = false; }
   });
   match.disabled = !state.flightLogs.some(log => log.aircraftId === null);
-  const transferAction = path => async () => {
-    if (!chosen.size) return notify("Select at least one log record.", true);
-    if (chosen.size > 20) return notify("Send or refresh up to 20 records at a time.", true);
-    setWorking(true);
-    try { const result = await api(path, { ids: [...chosen] }); notify(`${result.results.filter(item => !item.skipped).length} processed · ${result.results.filter(item => item.skipped).length} skipped. Inspect receipts for results.`); await refresh(); }
-    catch (error) { notify(error.message, true); }
-    finally { setWorking(false); }
-  };
-  const send = button("Send selected logs to AirData", transferAction("/api/airdata/send"), "primary");
-  const check = button("Refresh selected AirData status", transferAction("/api/airdata/refresh"));
-  send.disabled = check.disabled = !airdataSettings.available;
   const selectAll = button("Select all matching", () => { chosen.clear(); for (const log of matching()) chosen.add(log.id); update(); });
   const clear = button("Clear selection", () => { chosen.clear(); update(); });
   const mark = button("Mark selected as uploaded", async () => {
@@ -1679,17 +1618,15 @@ function showFlightLogs() {
   }, "primary");
   function setWorking(value) {
     working = value;
-    scope.disabled = filter.disabled = selectAll.disabled = clear.disabled = value;
-    send.disabled = check.disabled = value || !airdataSettings.available;
+    tracking.disabled = scope.disabled = filter.disabled = selectAll.disabled = clear.disabled = value;
     match.disabled = value || !state.flightLogs.some(log => log.aircraftId === null);
     update();
   }
-  panel.append(element("div", { class: "toolbar" }, scope, filter, match), element("div", { class: "toolbar" }, selectAll, clear, mark, selection),
-    element("p", { class: "form-help", text: "Unmarked logs default to Not uploaded. This upload to-do list includes unmarked, marked not uploaded, and failed records; processing, confirmed and uncertain submissions stay separate. Records may already exist in AirData." }),
-    element("p", { class: "form-help", text: "Select all matching uses the current aircraft and AirData filters. Manual marks record uploads you already made; no files are sent or verified." }),
-    element("div", { class: "toolbar" }, send, check),
-    element("p", { class: "form-help", text: "Sending or refreshing submissions is limited to 20 selected logs at a time. Manual marking can cover all matching logs." }),
-    element("p", { class: "form-help", text: airdataSettings.available ? "Sending transfers original files to AirData. Manual marks remain separate from confirmed processing; uncertain submissions are not automatically retried." : airdataSettings.reason || "Configure AirData in Settings to send original files." }), count, rows);
+  panel.append(element("div", { class: "toolbar" }, scope, match),
+    element("label", { class: "checkbox-label" }, tracking, element("span", { text: "Show manual upload tracking" })));
+  if (manualUploadTracking) panel.append(element("div", { class: "toolbar" }, filter, selectAll, clear, mark, selection),
+    element("p", { class: "form-help", text: "Optional notes about uploads you perform elsewhere, including AirData. Not recorded means no manual status was saved. No files are sent or verified. Select all matching uses the current aircraft and manual status filters." }));
+  panel.append(count, rows);
   update();
   content.replaceChildren(filingEntryPanel(),panel);
 }
@@ -1755,16 +1692,16 @@ async function showFlightDetail(id, revision) {
       element("div", { class: "toolbar" }, assignment, assign),
       element("label", { class: "checkbox-label" }, remember, element("span", { text: "Remember this record’s aircraft serial for future imports" })),
       !state.aircraft.length ? button("+ Add aircraft", () => openAircraft(), "text-button") : null));
-    const airdataSelect = element("select", { id: "flight-airdata-status", "aria-label": "AirData upload status" },
+    const airdataSelect = element("select", { id: "flight-airdata-status", "aria-label": "Manual upload status" },
       ...Object.entries(airdataLabels).map(([value, text]) => element("option", { value, text })));
     airdataSelect.value = log.airdataStatus || "unknown";
-    const saveStatus = button("Save AirData status", async event => {
+    const saveStatus = button("Save manual upload status", async event => {
       const target = event.currentTarget;
       target.disabled = true;
       airdataSelect.disabled = true;
       try {
         await api(`/api/flight-logs/${encodeURIComponent(id)}`, { airdataStatus: airdataSelect.value }, "PATCH");
-        notify("AirData status saved.");
+        notify("Manual upload status saved.");
         await refresh();
       } catch (error) {
         notify(error.message, true);
@@ -1772,12 +1709,12 @@ async function showFlightDetail(id, revision) {
         airdataSelect.disabled = false;
       }
     });
-    panel.append(element("div", { class: "airdata-tracker" },
-      element("h3", { text: "AirData upload tracking" }),
-      element("p", { class: "form-help", text: "Track uploads you perform in AirData. This status is your manual record; importing here does not upload or verify anything in AirData." }),
-      element("div", { class: "toolbar" }, element("label", {}, "AirData upload status", airdataSelect), saveStatus)));
-    const receipt = transferFor(log);
-    if (receipt) panel.append(element("div", { class: "airdata-tracker" }, element("h3", { text: "AirData submission receipt" }), element("p", { text: transferLabels[uploadState(log)] }), element("p", { text: receipt.message }), element("p", { class: "form-help", text: `Updated ${date(receipt.updatedAt, true)}. This confirms only the recorded submission, not current retention or all earlier account history.` })));
+    panel.append(element("details", { class: "airdata-tracker" },
+      element("summary", { text: "Manual upload tracking (optional)" }),
+      element("p", { class: "form-help", text: "Record uploads you perform elsewhere, including AirData. This optional note does not send files or verify an upload. Choose Not recorded to clear a manual mark." }),
+      element("div", { class: "toolbar" }, element("label", {}, "Manual upload status", airdataSelect), saveStatus)));
+    const receipt = log.airdataTransfer;
+    if (receipt) panel.append(element("details", { class: "airdata-tracker" }, element("summary", { text: "Historical AirData submission receipt" }), element("p", { text: transferLabels[receipt.status] || "Recorded submission" }), element("p", { text: receipt.message }), element("p", { class: "form-help", text: `Last recorded ${date(receipt.updatedAt, true)}. Historical evidence only; integration is deferred and this status is not refreshed. This does not confirm current account contents.` })));
     if (log.status === "archived") panel.append(element("p", { class: "warning-box", text: "Original archived without decoded measurements. Aircraft assignment is available; this file does not create or count as a flight session." }));
     if (!linkedSession && log.status !== "archived") panel.append(element("p", { class: "warning-box", text: log.aircraftId === null ? "This record is saved in the unassigned inbox. Choose an aircraft above; a dated session will be created when a valid flight start time is available." : "No session was created because the flight start date was unavailable. This original record is saved; you can create a manual session from Flight sessions." }));
     const framesPanel = element("section", { class: "panel" }, panelHeading("Local telemetry", log.status === "summary-only"

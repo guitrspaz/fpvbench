@@ -4,7 +4,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createStore} from '../src/store.mjs';
 import {createMemoryRepository} from './helpers/memory-repository.mjs';
-import {createFilingService,airdataFilingState} from '../src/import-filing.mjs';
+import {createFilingService} from '../src/import-filing.mjs';
 import {randomUUID} from 'node:crypto';
 import {chmodSync} from 'node:fs';
 let root,data,folder,store,service,clock;
@@ -16,7 +16,6 @@ beforeEach(async()=>{
 });
 afterEach(async()=>{await service.close();await store.close();await rm(root,{recursive:true,force:true});});
 const add=(name,text='synthetic original')=>writeFile(join(folder,name),text);
-const receipt=status=>({accountId,attemptId:randomUUID(),jobId:'job_SYNTHETIC',status,startedAt:new Date(clock).toISOString(),updatedAt:new Date(clock).toISOString(),message:'Synthetic receipt'});
 
 test('a scan rechecks identical bytes once after a metadata-only read change; import still rejects later changes',async()=>{
  await add('a.ridlog');await service.close();let calls=0;
@@ -40,7 +39,7 @@ test('scan is read-only, finds new bytes, renamed existing imports and duplicate
  const before=await store.exportWorkspace();
  expect(await service.getScan()).toBeNull();
  const scan=await service.scanFolder();
- expect(scan.summary).toMatchObject({newOriginals:1,alreadyImportedFiles:1,extraCopies:1,unassignedImports:1,airdataToReview:0});
+ expect(scan.summary).toMatchObject({newOriginals:1,alreadyImportedFiles:1,extraCopies:1,unassignedImports:1});
  expect(scan.files.find(f=>f.relativePath==='b.ridlog').duplicateOf).toBe('a.ridlog');
  expect(scan.files.find(f=>f.relativePath==='known.ridlog').logId).toBeTruthy();
  expect(await store.exportWorkspace()).toEqual(before);
@@ -132,15 +131,19 @@ test('replaced roots and symlink substitutions cannot read outside the scanned f
  expect((await service.importFiles({scanId:next.id,fileIds:[next.files[0].id]})).results[0].ok).toBe(false);
 });
 
-test('AirData filing separates explicit needs, unconfirmed, receipts, unsupported formats and account identities',()=>{
- const log={format:'dji-txt',airdataStatus:'unknown'};
- expect(airdataFilingState(log,accountId)).toMatchObject({state:'unconfirmed',needsReview:true,eligible:true});
- expect(airdataFilingState({...log,airdataStatus:'not-uploaded'},accountId).state).toBe('needs-send');
- expect(airdataFilingState({...log,airdataStatus:'uploaded'},accountId).needsReview).toBe(false);
- for(const status of ['success','pending','running','unknown','submitting'])expect(airdataFilingState({...log,airdataTransfer:receipt(status)},accountId).needsReview).toBe(false);
- expect(airdataFilingState({...log,airdataTransfer:receipt('error')},accountId).needsReview).toBe(true);
- expect(airdataFilingState({...log,airdataTransfer:receipt('success')},randomUUID()).state).toBe('unconfirmed');
- expect(airdataFilingState({...log,format:'unknown-log'},accountId).needsReview).toBe(false);
+test('folder review uses only local filing evidence and never asks for provider settings', async()=>{
+ await add('original.ridlog'); await service.close();
+ const getSettings=jest.fn(()=>{throw new Error('No provider reads allowed');});
+ service=await createFilingService(data,{store,airdata:{getSettings},defaultFolder:folder});
+ const scan=await service.scanFolder();
+ const imported=await service.importFiles({scanId:scan.id,fileIds:[scan.files[0].id]});
+ expect(imported.results[0].ok).toBe(true);
+ await store.updateFlightLog(imported.results[0].logId,{airdataStatus:'uploaded'});
+ const refreshed=await service.getScan();
+ expect(refreshed.id).toBe(scan.id);
+ expect(refreshed.files[0]).not.toHaveProperty('airdata');
+ expect(refreshed.summary).not.toHaveProperty('airdataToReview');
+ expect(getSettings).not.toHaveBeenCalled();
 });
 
 test('file-budget and scan-time bounds stop work instead of reporting a complete empty folder',async()=>{
