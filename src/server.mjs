@@ -5,6 +5,7 @@ import { resolve, dirname, extname, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { homedir } from "node:os";
 import { createStore } from "./store.mjs";
+import { controllerView } from './controller.mjs';
 import { compareSnapshots } from "./compare.mjs";
 import { AppError, assertSafeObject } from "./errors.mjs";
 
@@ -171,6 +172,16 @@ export async function createServer({
       const match = path.match(
         /^\/api\/(aircraft|snapshots|sessions|flight-logs)\/([^/]+)(\/(?:raw|frames))?$/,
       );
+      const controllerRoute = path.match(/^\/api\/snapshots\/([^/]+)\/controller$/);
+      if (controllerRoute) {
+        const id = controllerRoute[1];
+        if (req.method === "PUT") {
+          await store.saveController(id, await body(req,65536));
+          return json(res,200,controllerView(store.getSnapshot(id)));
+        }
+        if (req.method === "GET") return json(res,200,controllerView(store.getSnapshot(id)));
+        throw new AppError("API route was not found.",404);
+      }
       const journalRoute=path.match(/^\/api\/aircraft\/([^/]+)\/(journal|brief)(?:\/([^/]+))?$/);
       if(journalRoute) {
         const [,aircraftId,resource,entryId]=journalRoute;

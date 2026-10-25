@@ -1,5 +1,7 @@
 # Architecture
 
+**Last Updated:** October 25, 2026
+
 ## Local application
 
 FPVBench v0.7 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI requests use server-side fetch. AirData integration is deferred; the server never constructs its service.
@@ -32,7 +34,14 @@ The interface calls JSON endpoints for aircraft, setup imports/comparison, sessi
 | `src/assistant-glossary.mjs` | Supply fixed source-attributed Betaflight guidance. |
 | `src/server.mjs` | Loopback entry point, APIs, bounded input, downloads, and static assets. |
 | `src/errors.mjs` | Application errors and unsafe-object validation. |
-| `public/app.js` | Aircraft/history/comparison views, imports, and session forms. |
+| `public/app.js` | Aircraft/history/comparison views, imports, session forms, and beginner-page navigation. |
+| `public/controller.js` | Controller schematic, reference pickers, guided checks, and Advanced evidence/editor. |
+| `public/controller-language.js` | Pure action explanations, confidence, readable changes, and next steps for interpretation limits. |
+| `public/controller-check.js` | Pure observation validation and explicit flight/preferred/previous reference selection. |
+| `public/controller-guide.js` | Disposable three-step physical-check form. |
+| `public/controller-card.js` | Escaped standalone HTML card and local browser download. |
+| `public/getting-started.js` | Read-only example entry point, import guidance, and stopped-server recovery instructions. |
+| `public/demo-controller.js` | Synthetic controller-comparison fixture with no personal exports. |
 
 ## SQLite and originals
 
@@ -105,3 +114,27 @@ Aircraft JSON payloads optionally contain up to 500 journal entries; absence mea
 `GET/POST /api/aircraft/:id/journal` reads/creates entries; `PATCH /api/aircraft/:id/journal/:entryId` edits an entry or changes next-step status. The server owns IDs, creation/update/close timestamps and captured session titles. Session reassignment detaches old-aircraft journal links while retaining captured titles and user text. No entry is moved or automatically generated.
 
 `GET /api/aircraft/:id/brief` computes up to three oldest open next steps, three newest changes/observations, and references to the latest recorded session, latest saved setup and preferred baseline. Ties use entry IDs. Snapshot confirmation derives only from explicitly confirmed session links. The browser guards delayed brief responses against aircraft/view changes. Journal content is excluded from existing AI inputs and needs no provider access. See [the user guide](change-journal.md).
+
+## Controller 3 interpretation and observations
+
+The pure `src/controller.mjs` interpreter consumes preserved parsed exports and returns physical-control assignment/verification states plus normalized AUX mode comparisons. `public/controller.js` renders the original schematic, accessible control selection, setup/reference pickers, observation editor and comparison evidence. No AI or device access participates.
+
+Snapshots may contain optional `controller` metadata: model, positive optimistic revision, server update time and bounded control observations. Each observation has a kind (AUX/external/unknown), nullable AUX channel, up to five measured positions, note, verification boolean and server verification time. PUT replaces the bounded observation set and rejects stale revisions. The existing serialized mutation and JSON-payload persistence save it atomically without changing raw/parsed evidence, other snapshots or the database schema.
+
+`GET/PUT /api/snapshots/:id/controller` reads the derived view or saves observations (64 KiB input bound). `GET /api/compare` additionally returns a controller comparison restricted to one aircraft. Workspace validation checks optional metadata on load/restore; old snapshots need no migration. Before/after mappings are carried independently, and unknown comparison evidence never enters confirmed mode-change counts. See [Controller map](controller-map.md) for the supported interpretation boundary.
+
+
+Controller preview corrections: unsaved AUX suggestions and documented native power are derived display data, separate from persisted observations. GET never creates mappings. Single-control edits preserve all other controls' absence; template adoption fills only remaining suggestions; copying includes only recorded observations. Mode completeness may be established despite unrelated parser warnings only after auditing the complete 20-slot AUX domain against immutable raw source. Domain ambiguity, truncation, sparse exports and unsupported conditions retain their blockers. Existing parsed snapshots require no migration.
+
+
+The beginner presentation layer lives in browser-safe, pure public/controller-language.js: short action explanations, independent layout-confidence copy, and physical-control change grouping. It consumes the existing derived controller view and never mutates it. The renderer in public/controller.js shows the simple map first, with separate collapsed per-button/setup Advanced sections preserving the original editing/evidence controls. Raw comparisons retain their data and filters under a closed Advanced setting comparison disclosure. No schema, parser, device or assistant change is involved.
+
+## Beginner workflow boundaries
+
+The guided check collects an explicitly observed connection and two to five labeled receiver values for AUX controls, or a described external function. It requires confirmation that the selected backup matches the checked aircraft configuration and a separate physical-check acknowledgment. Leaving the guide unfinished saves nothing. Successful saves use the existing controller observation mutation and retain its revision conflict handling; other controls, raw exports and parsed evidence are preserved.
+
+Named reference shortcuts operate on the selected aircraft's existing history and sessions. The last-flight shortcut requires a confirmed snapshot link and a flight date no later than the selected import. Missing or identical references have an explanation rather than an inferred replacement. These choices do not establish the current aircraft configuration.
+
+The control-card builder creates a standalone escaped HTML document in the browser and downloads it through an object URL. Its mobile and print styles require no remote assets. It contains setup identity, visible actions, per-control confidence and recorded positions; it excludes source files, flight locations, serials and hidden notes. It has no script or live connection back to the workspace.
+
+Start here renders a separate synthetic comparison locally through the same controller renderer without save callbacks. The demo makes no catalog mutations or hardware requests. Recovery guidance links the existing complete export and explains the stopped-server restore command; it introduces no browser restore endpoint. No schema or data migration is needed for these presentation changes. See [beginner-alpha scope](scope-beginner-alpha.md) and [public-alpha guide](public-alpha.md).

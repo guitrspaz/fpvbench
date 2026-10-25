@@ -1,6 +1,6 @@
 {
   "name": "fpvbench",
-  "version": "0.7.2",
+  "version": "0.8.0-alpha.1",
   "private": true,
   "type": "module",
   "description": "A local workbench for FPV setup history and flight-session records.",

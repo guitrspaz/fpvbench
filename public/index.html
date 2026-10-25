@@ -26,12 +26,14 @@
       <button id="add-aircraft" class="subtle wide">+ Add aircraft</button>
       <button id="edit-aircraft" class="subtle wide" disabled>Edit aircraft</button>
       <nav aria-label="Workbench views">
+        <button class="nav-item" data-view="start"><span aria-hidden="true">○</span> Start here</button>
         <button class="nav-item active" data-view="overview">
           <span aria-hidden="true">◈</span> Overview
         </button>
         <button class="nav-item" data-view="history">
           <span aria-hidden="true">▤</span> Setup history
         </button>
+        <button class="nav-item" data-view="controller"><span aria-hidden="true">⊕</span> My controller</button>
         <button class="nav-item" data-view="compare">
           <span aria-hidden="true">⇄</span> Compare setups
         </button>
@@ -41,6 +43,7 @@
         <button class="nav-item" data-view="flights">
           <span aria-hidden="true">▥</span> Flight log library
         </button>
+        <button class="nav-item" data-view="recovery"><span aria-hidden="true">↓</span> Backup and recovery</button>
         <button class="nav-item" data-view="settings"><span aria-hidden="true">⚙</span> Settings</button>
       </nav>
       <div class="sidebar-note">
@@ -48,7 +51,7 @@
         <p>Your exports stay on this computer. No controller connection.</p>
       </div>
       <a class="export-link" href="/api/export" download>↓ Export workspace</a>
-      <span class="version">FPVBENCH / v0.7.2</span>
+      <span class="version">FPVBENCH / v0.8.0-alpha.1</span>
     </aside>
     <main>
       <header class="topbar">

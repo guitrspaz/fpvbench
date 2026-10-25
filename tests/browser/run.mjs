@@ -1,3 +1,7 @@
+import { runGettingStartedJourney } from './getting-started-journey.mjs';
+import { runGuidedControllerJourney } from './guided-controller-journey.mjs';
+import { runBeginnerControllerJourney } from './beginner-controller-journey.mjs';
+import { runControllerJourney } from './controller-journey.mjs';
 import { runJournalJourney } from './journal-journey.mjs';
 import { runBulkAirdataJourney } from './bulk-airdata-journey.mjs';
 import { runFilingJourney } from './filing-journey.mjs';
@@ -51,9 +55,13 @@ try {
   const journal=await runJournalJourney({page,expect,baseURL,baselineText,screenshotDir,provider,airdata});
   const filing=await runFilingJourney({page,expect,baseURL,folder:filingFolder,screenshotDir,provider,airdata});
   const bulkMarks=await runBulkAirdataJourney({page,expect,baseURL,folder:filingFolder,screenshotDir,provider,airdata});
+  const controller = await runControllerJourney({page,expect,baseURL,screenshotDir});
+  const beginner=await runBeginnerControllerJourney({page,expect,baseURL,screenshotDir});
+  const guided=await runGuidedControllerJourney({page,expect,baseURL,screenshotDir});
+  const gettingStarted=await runGettingStartedJourney({page,expect,baseURL});
   expect(airdataRequests).toEqual([]);
   expect((await readdir(dataDir)).some(name => name.startsWith('workspace.sqlite'))).toBe(false);
-  console.log(JSON.stringify({ browser: browser.version(), ...result, dji, ai, fleet, lifecycle, uploads, journal, filing, bulkMarks, providerCalls: provider.calls.length, airdataRequests: airdataRequests.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
+  console.log(JSON.stringify({ browser: browser.version(), ...result, controller, beginner, guided, gettingStarted, dji, ai, fleet, lifecycle, uploads, journal, filing, bulkMarks, providerCalls: provider.calls.length, airdataRequests: airdataRequests.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
 } finally {
   if (browser) await browser.close();
   if (server?.listening) await new Promise((resolve) => server.close(resolve));

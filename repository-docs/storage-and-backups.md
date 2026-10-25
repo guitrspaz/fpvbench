@@ -1,5 +1,7 @@
 # Storage and backups
 
+**Last Updated:** October 25, 2026
+
 ## Data directory
 
 FPVBench defaults to `~/.fpvbench/` on the computer running the server. Browser storage remembers the selected aircraft, fleet status filter and Metric/Imperial display preference. Display units do not change measurements in SQLite or exports. Set `FPVBENCH_DATA_DIR` to use another local directory.
@@ -46,6 +48,12 @@ Journal saves do not alter setup exports, imported measurements, original files,
 
 Folder scanning does not change the catalog or source files. Explicit imports retain originals and relationships through the existing store, with no schema migration. `node dev/verify-import-filing.mjs` checks scanning, selected import, preserved history and receipts, unchanged source bytes, restart and complete restore in disposable SQLite workspaces.
 
+## Keep a recoverable backup
+
+Open **Start here → Backup and recovery** for a download link and the restore walkthrough. The sidebar’s **Export workspace** downloads the same complete backup. Save one before an update or moving to another computer, and keep it somewhere separate from the active data directory.
+
+A portable workspace backup contains your records and original files. It excludes optional AI keys/history and local folder preferences; a private whole-directory copy made while FPVBench is stopped preserves those local files too.
+
 ## Complete export
 
 Use **Export workspace** in the interface. Version 3 JSON contains:
@@ -61,16 +69,31 @@ This is a complete portable backup rather than just a list of summaries. Keep it
 
 ## Restore
 
-Stop FPVBench, then run from the repository directory with a complete version 2 or 3 export:
+Restore replaces the active workspace; it does not merge two workspaces. Use a complete version 2 or 3 workspace export, rather than an individual Betaflight setup file.
+
+1. Keep the backup file. If the app still opens, export the current workspace too.
+2. Stop FPVBench: press **Ctrl+C** in its terminal, or use **Stop FPVBench** / `npm run service:stop` for the macOS service.
+3. Open a terminal in the repository directory. Run the command below with the actual backup path, retaining quotes around it.
+4. Read the result, then restart using the same method and data directory as before. Check the aircraft, setups, and flight records after reopening.
+
+macOS or Linux path example:
 
 ```sh
-node src/restore.mjs /absolute/path/fpvbench-workspace.json
+npm run restore -- "/absolute/path/fpvbench-workspace.json"
 ```
+
+Windows PowerShell path example:
+
+```powershell
+npm run restore -- "C:\Users\YOUR_NAME\Downloads\fpvbench-workspace.json"
+```
+
+Recovery currently requires this terminal command; the browser does not replace a running database.
 
 For a custom data directory, use the same value as your server:
 
 ```sh
-FPVBENCH_DATA_DIR=/absolute/path/fpvbench-data node src/restore.mjs /absolute/path/fpvbench-workspace.json
+FPVBENCH_DATA_DIR="/absolute/path/fpvbench-data" npm run restore -- "/absolute/path/fpvbench-workspace.json"
 ```
 
 The restore validates relationships, original fingerprints, and telemetry before replacing the active workspace. It preserves a backup of the previous workspace and refuses to run while its directory has a live owner. Start the server again with the same directory.
@@ -102,3 +125,7 @@ Manual marks and provider receipts remain in the catalog and complete exports/re
 `node dev/verify-log-intake-airdata.mjs` separately verifies archive and receipt persistence, original bytes, observations, restart dedupe and complete restore using disposable SQLite and a fake AirData transport.
 
 `node dev/verify-journal.mjs` separately verifies actual disposable SQLite journal persistence, lifecycle, restart, complete restore, older-backup compatibility and unchanged original/setup/session/upload evidence.
+
+## Controller observations
+
+Saved setups optionally include Controller 3 mapping observations and verification timestamps. They are separate from immutable raw/parsed export evidence, persist in the existing snapshot JSON payload, and travel with complete workspace exports. Validation rejects malformed observations during load/restore; older snapshots without them remain valid. Copying to another setup requires an explicit action and resets verification. Older application versions may reject new metadata; retain a pre-update backup if rollback is needed. See [Controller map](controller-map.md).

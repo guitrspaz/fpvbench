@@ -1,3 +1,5 @@
+import { mountGettingStarted, mountRecoveryGuide } from './getting-started.js';
+import { mountControllerWorkbench, renderController } from "./controller.js";
 import { formatRecapNumber, recapHighlights, displayUnits, formatRecapDistance, formatRecapDuration, formatRecapHeight, formatRecapSpeed, heightValue, speedValue } from "./recap-format.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -191,11 +193,13 @@ function showOnboarding() {
       ),
     ),
   );
-  panel.append(steps);
+  panel.append(steps, button("Explore a controller example", () => navigate("start"), "secondary"));
   content.replaceChildren(panel);
 }
 
 const viewCopy = {
+  start: ['START HERE', 'Start here', 'Explore an example, save a backup, and check your controls.'],
+  recovery: ['YOUR LOCAL RECORDS', 'Backup and recovery', 'Keep a complete backup and follow the recovery steps when you need them.'],
   overview: [
     "SETUP. FLY. LEARN.",
     "Your flight workbench",
@@ -206,10 +210,11 @@ const viewCopy = {
     "Setup history",
     "Your original exports, saved as immutable snapshots.",
   ],
+  controller: ["KNOW YOUR CONTROLS", "My controller", "See what each button does and what changed between saved setups."],
   compare: [
     "UNDERSTAND THE CHANGE",
     "Compare setups",
-    "Literal settings side by side, with uncertainty kept visible.",
+    "See how the controls changed between two saved backups.",
   ],
   sessions: [
     "FROM THE FIELD",
@@ -227,7 +232,7 @@ async function render() {
   const [eyebrow, title, description] = viewCopy[currentView];
   $("#page-eyebrow").textContent = eyebrow;
   $("#page-title").textContent = currentView==="journal"&&selectedAircraft()? `${selectedAircraft().name} journal` : title;
-  $("#page-description").textContent = selectedAircraft() && !["settings", "flights", "filing"].includes(currentView)
+  $("#page-description").textContent = selectedAircraft() && !["settings", "flights", "filing", "start", "recovery"].includes(currentView)
     ? `${selectedAircraft().name} · ${description}`
     : description;
   $("#breadcrumb").textContent =
@@ -238,7 +243,9 @@ async function render() {
     if (active) item.setAttribute("aria-current", ["journal","filing"].includes(currentView)?"location":"page");
     else item.removeAttribute("aria-current");
   });
-  $(".heading-actions").hidden = ["settings","filing"].includes(currentView);
+  $(".heading-actions").hidden = ["settings","filing","start","recovery"].includes(currentView);
+  if (currentView === "start") { mountGettingStarted(content, { onImport: () => aircraftId ? openImport() : openAircraft() }); return; }
+  if (currentView === "recovery") { mountRecoveryGuide(content); return; }
   if (currentView === "settings") return showSettings();
   if (!["flights","filing"].includes(currentView) && !aircraftId) return showOnboarding();
   if (currentView === "filing") return showFiling(revision);
@@ -247,6 +254,11 @@ async function render() {
     if (detailId && snapshots().some((item) => item.id === detailId))
       await showDetail(detailId, revision);
     else showHistory();
+  }
+  if (currentView === "controller") {
+    const host = element("section", { class: "panel" });
+    content.replaceChildren(host);
+    mountControllerWorkbench(host, { history: snapshots(), sessions: sessions(), baselineId: selectedAircraft()?.baselineSnapshotId, aircraftName: selectedAircraft()?.name, isCurrent: () => revision === renderRevision });
   }
   if (currentView === "compare") showCompare(revision);
   if (currentView === "sessions") showSessions();
@@ -797,12 +809,17 @@ async function showDetail(id, revision) {
       item.addEventListener("input", update),
     );
     panel.append(
-      element("div", { class: "toolbar" }, search, category, profile),
-      resultCount,
-      element("div", { class: "table-wrap" }, table),
+      element("details", {},
+        element("summary", { text: "Raw settings and commands" }),
+        element("div", { class: "toolbar" }, search, category, profile),
+        resultCount,
+        element("div", { class: "table-wrap" }, table),
+      ),
     );
     update();
-    content.replaceChildren(panel);
+    const controllerHost = element("section", { class: "panel" });
+    content.replaceChildren(panel, controllerHost);
+    mountControllerWorkbench(controllerHost, { history: snapshots(), currentId: id, sessions: sessions(), baselineId: selectedAircraft()?.baselineSnapshotId, aircraftName: selectedAircraft()?.name, isCurrent: () => revision === renderRevision });
     if (aiSettings.available) {
       const assistantPanel = snapshotAiPanel(snapshot, revision);
       content.prepend(assistantPanel);
@@ -864,7 +881,7 @@ function showCompare(revision) {
     ),
     element("p", {
       class: "selection-note",
-      text: "Missing values in diff or partial exports are unknown. Comparisons describe exports and do not certify compatibility or flightworthiness.",
+      text: "This compares saved backups. It does not check the quad’s current settings.",
     }),
     results,
   );
@@ -893,6 +910,8 @@ function showCompare(revision) {
 }
 
 function showComparisonResults(container, comparison) {
+  const controllerHost = element("div");
+  if (comparison.controller) renderController(controllerHost, { view: comparison.controller.after, comparison: comparison.controller, referenceLabel: comparison.from.label });
   const counts = element("div", { class: "comparison-counts" });
   ["changed", "added", "removed", "unknown", "unchanged"].forEach((key) =>
     counts.append(
@@ -913,7 +932,7 @@ function showComparisonResults(container, comparison) {
     "select",
     { "aria-label": "Change filter" },
     ...[
-      ["changes", "Changes + unknown"],
+      ["changes", "Confirmed changes"],
       ["", "All rows"],
       ["changed", "Changed"],
       ["added", "Added"],
@@ -956,7 +975,7 @@ function showComparisonResults(container, comparison) {
     const rows = comparison.rows.filter(
       (item) =>
         (change.value === "changes"
-          ? item.change !== "unchanged"
+          ? !["unchanged", "unknown"].includes(item.change)
           : !change.value || item.change === change.value) &&
         (!category.value || item.category === category.value) &&
         (!profile.value || profileLabel(item) === profile.value) &&
@@ -1015,11 +1034,17 @@ function showComparisonResults(container, comparison) {
     item.addEventListener("input", update),
   );
   container.replaceChildren(
-    warningBox(comparison.warnings) || document.createTextNode(""),
-    counts,
-    element("div", { class: "toolbar" }, search, change, category, profile),
-    resultCount,
-    element("div", { class: "table-wrap" }, table),
+    controllerHost,
+    element("details", { class: "advanced-setting-comparison" },
+      element("summary", { text: "Advanced setting comparison" }),
+      element("h2", { text: "Setting differences" }),
+      element("p", { class: "form-help", text: "Unknown values have a separate count and filter; they are not confirmed changes." }),
+      warningBox(comparison.warnings) || document.createTextNode(""),
+      counts,
+      element("div", { class: "toolbar" }, search, change, category, profile),
+      resultCount,
+      element("div", { class: "table-wrap" }, table),
+    ),
   );
   update();
 }

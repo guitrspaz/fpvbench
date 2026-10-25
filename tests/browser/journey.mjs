@@ -90,6 +90,7 @@ export async function runJourney({ page, expect, baseURL, baselineText, experime
   await page.getByRole('button', { name: 'Set as baseline', exact: true }).click();
   await expect(page.getByText('PREFERRED BASELINE', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: /Compare setups/ }).click();
+  await page.getByText('Advanced setting comparison', { exact: true }).click();
   await expect(page.getByRole('columnheader', { name: 'Baseline smoke', exact: true })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: 'Experiment smoke', exact: true })).toBeVisible();
   const changed = page.getByRole('row').filter({ hasText: 'p_roll' }).filter({ hasText: 'PID 0' });
@@ -97,13 +98,13 @@ export async function runJourney({ page, expect, baseURL, baselineText, experime
   await expect(changed).toContainText('48');
   await expect(changed).toContainText('changed');
   const sparse = page.getByRole('row').filter({ hasText: 'i_roll' }).filter({ hasText: 'PID 0' });
-  await expect(sparse).toContainText('80');
-  await expect(sparse).toContainText('Unknown · not in export');
+  await expect(sparse).toHaveCount(0);
   await expect(page.getByRole('row').filter({ hasText: 'smoke_literal' })).toContainText('<img src=x');
-  expect(await page.evaluate(() => globalThis.__fpvbenchExecuted === true)).toBe(false);
   await page.getByLabel('Change filter').selectOption('unknown');
   await expect(changed).toHaveCount(0);
-  await expect(sparse).toBeVisible();
+  await expect(sparse).toContainText('80');
+  await expect(sparse).toContainText('Unknown · not in export');
+  expect(await page.evaluate(() => globalThis.__fpvbenchExecuted === true)).toBe(false);
   await page.getByLabel('Change filter').selectOption('changes');
   if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/fpvbench-comparison.png`, fullPage: true });
 

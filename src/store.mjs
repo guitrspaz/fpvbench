@@ -1,3 +1,4 @@
+import { updateController } from './controller.mjs';
 import { buildNextSessionBrief } from './journal.mjs';
 import { validateTransfer } from './airdata-transfer.mjs';
 import { decodeLog } from './log-import.mjs';
@@ -209,6 +210,11 @@ export async function createStore(dataDir, { repositoryFactory, decodeFlight } =
       if (next.snapshots.some(snapshot => snapshot.aircraftId === input.aircraftId && snapshot.sha256 === sha256)) parsed.warnings.push('An identical export has already been imported for this aircraft.');
       const record = { id: randomUUID(), aircraftId: input.aircraftId, label: input.label, notes, filename: input.filename, importedAt: timestamp(), sha256, rawText: input.rawText, parsed };
       next.snapshots.push(record); return { value: record };
+    }),
+    saveController: (id, input) => mutate(next => {
+      const snapshot = getRecord(next, 'snapshots', id);
+      snapshot.controller = updateController(snapshot.controller, input, timestamp());
+      return { value: snapshot.controller };
     }),
     createSession: input => mutate(next => {
       objectInput(input, sessionFields); const record = sessionRecord(input);

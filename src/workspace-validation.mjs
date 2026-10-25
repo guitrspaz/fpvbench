@@ -1,3 +1,4 @@
+import { validateController } from './controller.mjs';
 import { createHash } from "node:crypto";
 import { AppError, assertSafeObject, containsControlText } from "./errors.mjs";
 import { parseExport } from "./parser.mjs";
@@ -185,7 +186,9 @@ export function validateWorkspace(state) {
           "sha256",
           "rawText",
           "parsed",
+          "controller",
         ]);
+        if (record.controller !== undefined) validateController(record.controller);
         getRecord(state, "aircraft", record.aircraftId);
         textField(record.label, "label", { required: true, max: 200 });
         textField(record.notes, "notes");

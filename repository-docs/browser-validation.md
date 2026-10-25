@@ -1,5 +1,31 @@
 # Browser validation
 
+
+## Beginner-first controller view — October 25, 2026
+
+ESLint and all 241 Jest tests passed across 25 suites. Nine new pure presentation tests cover readable action meanings, incomplete/unsupported evidence, arming permission distinct from motor stop, overlapping versus separate arm/rescue ranges, physical-button grouping, range-only changes, equivalent actions moved between channels, independent layout confidence and immutability.
+
+The complete local Chromium journey passed with the existing advanced workflow and 12 added beginner scenarios. A synthetic three-backup sequence exercises four readable role changes, a historical shared motor-arm/GPS-recovery assignment, no guessed physical directions, hidden channel/range/parser jargon by default, unlinked custom actions, the See what changed jump, preserved Advanced editing/comparison controls, keyboard use and phone overflow. Browser reads leave all three new snapshots without saved controller metadata.
+
+Desktop and 390-pixel phone screenshots were inspected. Seven fake AI calls and zero AirData requests were retained. All automated persistence used the injected memory repository; no database or personal aircraft records were used in tests. This validates the software flow and responsive layout, not a study with actual novice users. Personal F5 imports informed read-only diagnosis, not fixture contents or hardware checks.
+
+
+## Controller preview and mode-warning correction — October 24, 2026
+
+The corrected implementation passed ESLint, all 232 Jest tests across 24 suites, and the complete local Chromium journey. The controller journey now includes 21 named scenarios, starting from untouched full synthetic CLI exports with section headings and feature reset/re-enable warnings. It proves immediate unverified preview, read-only views with no saved mapping, isolated single-control saves, preservation of other unsaved suggestions, explicit template adoption, documented native power, warning-domain isolation, meaningful changes before adoption, sparse comparison gaps, and prior verification/copy/mobile behaviors.
+
+All automated data is independently generated, uses the injected memory repository, and opens no database. Personal exports were inspected read-only for diagnosis and were not copied into fixtures. Original parser output and import warnings are retained unchanged. Native preview functions and expected AUX mappings are derived display data only. The browser run retained seven fake AI calls and zero AirData requests.
+
+
+## Controller 3 map — October 24, 2026
+
+The complete synthetic journey passed in local Chromium 156.0.8078.47. Nineteen named Controller 3 scenarios cover previous-import reference selection, independent setup mappings, normalized behavior changes, unknown physical mappings, unverified suggested channels, explicit operator verification, measured positions, inert notes, reload, edits/copy resetting verification, reference isolation, controller/camera classification, no-aircraft-mode assignments, failed-save preservation, sparse unknown comparisons, keyboard activation and desktop/mobile layout. Existing application journeys also passed.
+
+Desktop (1440-pixel) and mobile (390-pixel) screenshots were captured and inspected. Editors and range evidence remain expandable; the default view emphasizes controls and badges. The original settings comparison now excludes unknown rows from Confirmed changes and exposes them through its separate filter.
+
+All data came from the existing synthetic in-memory repository in disposable directories. No database or personal workspace was opened. The suite retained seven fake AI calls and zero AirData requests. MCP_DOCKER could reach the host bridge, but the application's loopback hostname policy correctly refused it; local Chromium supplied the complete browser validation without changing that policy.
+
+
 ## Reproduce
 
 From the repository root:
@@ -157,3 +183,20 @@ Desktop and 390-pixel mobile screenshots were inspected. Existing journeys retai
 The complete synthetic browser journey passed 104 checks. Four added checks cover aircraft-named headings, opening a journal from its Overview panel, a read-only Aircraft field in the entry form, and a DJI-style aircraft entry without setup/session links. Switching aircraft keeps the journals separate. The global Journal navigation item was removed; Overview remains the parent location.
 
 Existing lifecycle, delayed-response, mobile, export and fake-provider checks remain covered. No database, personal records, real upload or billed request was used.
+
+## Guided beginner workflow · October 25, 2026
+
+The full journey passed with local Chrome 156.0.8078.47 at desktop and 390px mobile sizes. All records were synthetic, using the injected memory repository; no SQLite database was opened. Existing provider journeys used seven fake AI calls and made zero AirData requests.
+
+| Scenario | Verified result |
+| --- | --- |
+| Named comparison references | Previous import and preferred setup resolve correctly; last confirmed flight excludes unconfirmed, foreign, dangling and later records. |
+| Guided mapping check | Unidentified channel and insufficient positions cannot continue; leaving unfinished saves nothing. |
+| Explicit final check | Matching-backup acknowledgment and physical-observation acknowledgment are both required; only the checked control is persisted. |
+| Reload and change badges | Verification survives reload and remains visible beside expected historical changes. |
+| Offline control card | Download contains selected identity and per-control checked/expected status; raw source and hidden notes are excluded; source text is escaped. |
+| Mobile / print | Card remains readable at 390px and contains all eight controls in print media; guided form fits the viewport. Add/Edit aircraft buttons occupy separate mobile rows. |
+| Read-only example | Setup switching and control exploration produce no API writes or catalog changes. |
+| Recovery entry | Complete export link and stopped-server restore instructions are available from Start here and Backup and recovery. No restore runs from the browser. |
+
+Screenshots used for visual inspection are disposable local artifacts and are not part of the source distribution. These checks do not substitute for receiver measurements, actual aircraft checks or novice user research.

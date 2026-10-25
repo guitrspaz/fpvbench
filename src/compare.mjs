@@ -1,3 +1,4 @@
+import { compareControllers } from './controller.mjs';
 import { AppError } from "./errors.mjs";
 
 /** Public history summary excludes full source and per-setting records. */
@@ -113,6 +114,7 @@ export function compareSnapshots(from, to) {
     from: summarizeSnapshot(from),
     to: summarizeSnapshot(to),
     rows,
+    controller: compareControllers(from, to),
     warnings: [...new Set(warnings)],
     counts,
   };

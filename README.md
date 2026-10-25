@@ -1,8 +1,10 @@
 # FPVBench
 
-**Remember your setups. Organize your flights. See what changed.**
+**Understand your controls. Remember your setups. See what changed.**
 
-FPVBench brings Betaflight setup history, copied flight records, and your own flight observations together in one local drone workbench. Keep a reference setup, compare changes, and give every aircraft a history you can return to.
+FPVBench turns saved Betaflight backups into a readable controller guide and setup history. See what each button is assigned to do, record which controls you have checked, and compare the next backup with a useful reference.
+
+Copied flight records and your own observations can live alongside that history in the same local workbench.
 
 Built for FPV pilots with a growing fleet, with a place for DJI photography-drone records too.
 
@@ -19,6 +21,12 @@ Built for FPV pilots with a growing fleet, with a place for DJI photography-dron
 | Connect setups with observations | Record equipment, conditions, notes, results, and footage references in flight sessions; link the setup you used. |
 | Keep your fleet's history | Store registration IDs and serials; retire an aircraft from the active fleet while keeping its records. |
 | Get a quick explanation | Enable optional AI for setup explanations and a flight recap focused on the selected aircraft. |
+
+## Know your Controller 3
+
+Open **My controller** for plain-language button actions and what changed between setups. Select a button to learn what it does, then choose **Check this control** for a guided check: identify the connection, record the positions you observe, and confirm the saved observation. Suggestions never become checked assignments automatically.
+
+Compare against the previous import, your preferred setup, or the last setup explicitly confirmed in a flight before the selected import. Download an offline HTML control card to view on your phone or print. Unknowns have their own next steps and stay separate from confirmed changes; Advanced details retain the original evidence and editor. [Controller map guide →](repository-docs/controller-map.md)
 
 ## Remember the setup behind the flight
 
@@ -79,6 +87,10 @@ npm start
 
 Open **http://127.0.0.1:4173**. In manual mode, leave the terminal running and press **Ctrl+C** to stop. Your records survive a restart.
 
+Open **Start here**, then **Try the example** to explore two synthetic Controller 3 setups. This read-only example needs no hardware and adds nothing to your real workspace. When ready, add an aircraft, save a full Betaflight `dump all` text backup, and import it with a recognizable name. Open **My controller** to identify and check its controls.
+
+Start here also includes **Backup and recovery**. Download a complete workspace backup before an update or a move; restoration currently uses the documented stopped-server terminal command. [Backup and restore guide →](repository-docs/storage-and-backups.md)
+
 ### Run independently on macOS
 
 Stop the manual server first, then install the background service:
@@ -90,11 +102,11 @@ npm run service:open
 
 Installation creates **FPVBench.app** and **FPVBench Controls** in your home **Applications** folder. The controls provide Start, Stop, Restart, and Status. Closing the terminal or browser leaves the service running; it starts at login by default. Use `npm run service:install -- --no-login` for background operation without login startup. [Startup, updates, and removal →](repository-docs/macos-startup.md)
 
-Add an aircraft, import a setup or a batch of DJI files, and explore its history. AI can be configured later in Settings.
+AI can be configured later in Settings. The controller guide, comparisons, journal, demo, and backups work without it.
 
 ## Guides and development
 
-[All documentation](repository-docs/README.md) · [Betaflight imports](repository-docs/betaflight-imports.md) · [Flight log imports](repository-docs/dji-flight-imports.md) · [Manual upload tracking](repository-docs/airdata.md) · [Optional AI](repository-docs/optional-ai.md) · [Backups](repository-docs/storage-and-backups.md) · [Architecture](repository-docs/architecture.md)
+[All documentation](repository-docs/README.md) · [Alpha scope and compatibility](repository-docs/public-alpha.md) · [Betaflight imports](repository-docs/betaflight-imports.md) · [Flight log imports](repository-docs/dji-flight-imports.md) · [Manual upload tracking](repository-docs/airdata.md) · [Optional AI](repository-docs/optional-ai.md) · [Backups](repository-docs/storage-and-backups.md) · [Architecture](repository-docs/architecture.md)
 
 ```sh
 npm run check
@@ -106,6 +118,8 @@ Automated checks use synthetic data and injected memory repositories. Separate d
 
 ## Project status
 
-FPVBench is an early-stage, single-workstation application. The repository is currently private; a public release and license have not been selected. GitHub Release installation packages with background/login setup choices are planned.
+FPVBench is an early-stage, single-workstation application being prepared for a public alpha. The repository remains private and a public release and project license are pending. There is no packaged installer yet; installation requires Node.js, npm, and a repository checkout.
+
+The physical button guide currently covers **DJI FPV Remote Controller 3** and selected **Betaflight 4.5.x** mode assignments. Complete behavior comparisons require matching firmware and board metadata. Other saved setups can retain their history without a fully interpreted controller map. DJI decoding also has format-specific limits. [Compatibility and the proposed first alpha →](repository-docs/public-alpha.md)
 
 Direct controller capture/deployment, encrypted-telemetry keychain support, Blackbox analysis, media uploads, and cloud hosting are future work.

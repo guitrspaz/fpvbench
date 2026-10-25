@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, test, expect } from '@jest/globals';
 import { request as httpRequest } from 'node:http';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from '../src/server.mjs';
@@ -29,7 +29,7 @@ test('service readiness exposes only application identity and version', async ()
   const data = await response.json();
   expect(Object.keys(data).sort()).toEqual(['application', 'version']);
   expect(data.application).toBe('FPVBench');
-  expect(data.version).toMatch(/^\d+\.\d+\.\d+$/);
+  expect(data.version).toBe(JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version);
 });
 
 test('aircraft identifiers are editable through the API and retained in state and export', async () => {
@@ -223,4 +223,25 @@ test('manually tracks AirData status without changing original flight details or
   const exported = await (await request('/api/export')).json();
   expect(exported.flightLogs[0].airdataStatus).toBe('uploaded');
   expect(exported.originals[0].contentBase64).toBe(payload.contentBase64);
+});
+
+test('Controller 3 endpoints validate observations, isolate setups, and compare behaviors separately', async () => {
+  const aircraft=await(await request('/api/aircraft','POST',{name:'Synthetic controller quad'})).json();
+  const raw='# dump all\n# Betaflight / TEST 4.5.2\naux 0 0 3 1700 2100 0 0\nsave\n';
+  const make=async(label,text)=> (await request('/api/snapshots','POST',{aircraftId:aircraft.id,label,filename:'synthetic.txt',rawText:text})).json();
+  const a=await make('Earlier',raw),b=await make('Later',raw.replace('0 0 3','0 0 1'));
+  const endpoint='/api/snapshots/'+b.id+'/controller';
+  expect((await request(endpoint)).status).toBe(200);
+  const before=await(await request(endpoint)).json();expect(before.revision).toBe(0);
+  const controls={'start-stop':{kind:'aux',aux:2,positions:[],note:'Synthetic observation',verified:true}};
+  const saved=await request(endpoint,'PUT',{model:'dji-fpv-rc3',revision:0,controls});expect(saved.status).toBe(200);
+  expect((await saved.json()).controls.find(c=>c.id==='start-stop')).toMatchObject({assignment:'assigned',verified:true});
+  expect((await request(endpoint,'PUT',{model:'dji-fpv-rc3',revision:0,controls})).status).toBe(409);
+  expect((await request(endpoint,'PUT',{model:'dji-fpv-rc3',revision:1,controls:{c1:{}}})).status).toBe(400);
+  expect((await request('/api/snapshots/missing/controller')).status).toBe(404);
+  expect((await request(endpoint,'PUT',{padding:'x'.repeat(66000)})).status).toBe(413);
+  const comparison=await(await request('/api/compare?from='+a.id+'&to='+b.id)).json();
+  expect(comparison.controller.counts).toMatchObject({changed:2,unknown:0});
+  expect((await(await request('/api/snapshots/'+a.id+'/controller')).json()).revision).toBe(0);
+  const backup=await(await request('/api/export')).json();expect(backup.snapshots.find(s=>s.id===b.id).controller.revision).toBe(1);
 });

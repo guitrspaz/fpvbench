@@ -1,5 +1,32 @@
 # Validation
 
+
+## Beginner-first controller view — October 25, 2026
+
+ESLint and all 241 Jest tests passed across 25 suites. Nine new pure presentation tests cover readable action meanings, incomplete/unsupported evidence, arming permission distinct from motor stop, overlapping versus separate arm/rescue ranges, physical-button grouping, range-only changes, equivalent actions moved between channels, independent layout confidence and immutability.
+
+The complete local Chromium journey passed with the existing advanced workflow and 12 added beginner scenarios. A synthetic three-backup sequence exercises four readable role changes, a historical shared motor-arm/GPS-recovery assignment, no guessed physical directions, hidden channel/range/parser jargon by default, unlinked custom actions, the See what changed jump, preserved Advanced editing/comparison controls, keyboard use and phone overflow. Browser reads leave all three new snapshots without saved controller metadata.
+
+Desktop and 390-pixel phone screenshots were inspected. Seven fake AI calls and zero AirData requests were retained. All automated persistence used the injected memory repository; no database or personal aircraft records were used in tests. This validates the software flow and responsive layout, not a study with actual novice users. Personal F5 imports informed read-only diagnosis, not fixture contents or hardware checks.
+
+
+## Controller preview and mode-warning correction — October 24, 2026
+
+The corrected implementation passed ESLint, all 232 Jest tests across 24 suites, and the complete local Chromium journey. The controller journey now includes 21 named scenarios, starting from untouched full synthetic CLI exports with section headings and feature reset/re-enable warnings. It proves immediate unverified preview, read-only views with no saved mapping, isolated single-control saves, preservation of other unsaved suggestions, explicit template adoption, documented native power, warning-domain isolation, meaningful changes before adoption, sparse comparison gaps, and prior verification/copy/mobile behaviors.
+
+All automated data is independently generated, uses the injected memory repository, and opens no database. Personal exports were inspected read-only for diagnosis and were not copied into fixtures. Original parser output and import warnings are retained unchanged. Native preview functions and expected AUX mappings are derived display data only. The browser run retained seven fake AI calls and zero AirData requests.
+
+
+## Controller 3 map — October 24, 2026
+
+- ESLint and all 221 Jest tests passed across 24 suites, including normalization, unknown evidence, assignment/verification separation, strict observation validation, concurrency, atomic repository failure, setup isolation, restart, complete backup validation and HTTP contracts.
+- The full local Chromium browser journey passed with synthetic data and memory repositories. New controller coverage includes 19 named scenarios: template/copy/reset verification, observed positions, notes rendered inertly, reload, native functions, unassigned channels, failed saves, setup/reference selection, keyboard activation, changed/unknown separation and desktop/mobile overflow.
+- Original exports and parsed evidence remain unchanged in observation-save tests. No automated test opened a database or used personal aircraft records.
+- The full browser run made seven fake AI calls and zero AirData requests. Controller interpretation itself is deterministic and makes no provider requests.
+- MCP_DOCKER could not inspect the loopback-only application through its container hostname. Local Chromium 156.0.8078.47 completed the journey with the existing host/origin protections intact. Synthetic desktop/mobile screenshots were inspected.
+- This verifies software interpretation and observation storage. No live receiver mapping, button latch behavior, physical flight control, hardware response, or firmware migration was tested.
+
+
 ## Reproduce
 
 Requires Node.js 22.13+ and npm.
@@ -155,3 +182,13 @@ Parser coverage includes Betaflight profile namespaces, sparse omissions, select
 Representative real files establish those records' local summary parsing; their exact originating controller/model/firmware combinations were not independently established. No claim is made for every RC, RC2, or Goggles N3 export variant. Version 14 telemetry remains encrypted and unavailable in this version. DAT remains unsupported; unrecognized accepted originals have archive-only status.
 
 Manual upload status is separate from historical provider receipts. AirData integration is currently deferred; standalone service tests and the intake proof exercise dormant code with a fake transport. A confirmed receipt establishes only the recorded submission processing result, not historical account reconciliation. No external upload, DJI keychain request, live hardware connection, controller restoration/deployment, or flight-performance validation occurred. This is single-workstation software; evidence does not establish authenticated internet hosting or multi-user support.
+
+## Beginner workflow and alpha preparation · October 25, 2026
+
+- Version 0.8.0-alpha.1: ESLint and all 254 Jest tests in 27 suites passed locally.
+- Pure presentation tests cover explicit physical-check acknowledgment, measured-position validation, unavailable/dangling/same-setup flight references, source escaping and private-context exclusions in offline control cards, and actionable unknown guidance.
+- Synthetic example downloads reproduce the demo’s complete mode evidence. Demo fixtures never record physical verification.
+- The complete local Chrome journey passed using the memory repository; no database was opened. It includes guided-check cancellation, explicit final save, single-control isolation, reference shortcuts, card download/print/mobile presentation, and read-only demo/recovery navigation.
+- Actionlint passed for the prepared Node 22/24 CI workflow. Hosted results must be established on the pushed commit; local results alone do not establish hosted CI.
+- Secret and privacy checks were performed separately; their detailed findings remain private. No public release or license adoption is implied by software validation.
+- The documented novice usability task script remains a human follow-up. No human usability sessions were conducted as part of automated validation.
