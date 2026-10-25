@@ -1146,3 +1146,9 @@ input[type="file"]::file-selector-button {
   .sidebar #add-aircraft { grid-row: 2; }
   .sidebar #edit-aircraft { grid-row: 3; }
 }
+
+.practice-banner { border: 1px solid var(--amber); border-left: 4px solid var(--amber); border-radius: 6px; margin-bottom: 20px; padding: 16px 18px; background: var(--panel); }
+.practice-banner p { color: var(--muted); margin: 8px 0 0; line-height: 1.6; }
+
+/* Keep all navigation and export controls reachable on shorter desktop windows. */
+.sidebar { overflow-y: auto; }

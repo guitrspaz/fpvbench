@@ -1,3 +1,5 @@
+import { startPracticeWorkspace } from '../../src/practice-workspace.mjs';
+import { runPracticeJourney } from './practice-journey.mjs';
 import { runGettingStartedJourney } from './getting-started-journey.mjs';
 import { runGuidedControllerJourney } from './guided-controller-journey.mjs';
 import { runBeginnerControllerJourney } from './beginner-controller-journey.mjs';
@@ -59,9 +61,17 @@ try {
   const beginner=await runBeginnerControllerJourney({page,expect,baseURL,screenshotDir});
   const guided=await runGuidedControllerJourney({page,expect,baseURL,screenshotDir});
   const gettingStarted=await runGettingStartedJourney({page,expect,baseURL});
+  const practiceServer = await startPracticeWorkspace({port:0});
+  let practice;
+  const practiceContext = await browser.newContext({viewport:{width:1440,height:1000}});
+  try {
+    const practicePage = await practiceContext.newPage();
+    await practicePage.route('**/*', route => new URL(route.request().url()).origin === new URL(practiceServer.url).origin ? route.continue() : route.abort());
+    practice = await runPracticeJourney({page:practicePage,expect,baseURL:practiceServer.url,screenshotDir});
+  } finally { await practiceContext.close(); await practiceServer.close(); }
   expect(airdataRequests).toEqual([]);
   expect((await readdir(dataDir)).some(name => name.startsWith('workspace.sqlite'))).toBe(false);
-  console.log(JSON.stringify({ browser: browser.version(), ...result, controller, beginner, guided, gettingStarted, dji, ai, fleet, lifecycle, uploads, journal, filing, bulkMarks, providerCalls: provider.calls.length, airdataRequests: airdataRequests.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
+  console.log(JSON.stringify({ browser: browser.version(), ...result, controller, beginner, guided, gettingStarted, practice, dji, ai, fleet, lifecycle, uploads, journal, filing, bulkMarks, providerCalls: provider.calls.length, airdataRequests: airdataRequests.length, persistence: 'synthetic in-memory repository; no database opened' }, null, 2));
 } finally {
   if (browser) await browser.close();
   if (server?.listening) await new Promise((resolve) => server.close(resolve));

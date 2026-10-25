@@ -6,7 +6,7 @@ FPVBench is a source-only alpha centered on understanding saved FPV controls and
 
 ## Start with one aircraft
 
-1. Install Node.js 22.13 or newer, then follow the [quickstart](../README.md#get-started). Installation currently requires npm and a repository checkout; no packaged installer is available.
+1. For the public source alpha, install Node.js 22.13 or newer and follow the [quickstart](../README.md#get-started). A [native Apple Silicon installer preview](macos-startup.md#native-apple-silicon-installer-preview) can be built locally with its runtime included; it is not a signed, notarized public download.
 2. Open **Start here → Try the example**. The two synthetic Controller 3 setups can be explored without importing data or connecting hardware.
 3. Add your aircraft. Save a full Betaflight `dump all` text backup and import it with a name you will recognize.
 4. Open **My controller**, choose a control, and read its action. Use **Check this control** to record your own observations for that saved setup.
@@ -25,8 +25,9 @@ The control guide, comparisons, journal, demo, and backups work with AI disabled
 | Saved setup history | Original Betaflight text and parsed settings remain available even when the physical guide cannot fully explain them. Omitted defaults are not reconstructed. |
 | DJI flight records | FlightRecord TXT versions 1–14 and compatible decoded JSON. Available decoding depends on format and file contents; newer encrypted TXT files retain locally available summaries without remote keychain requests. |
 | Other flight files | Recognized PX4 ULog, ArduPilot DataFlash, MAVLink TLog/JSON-lines and Betaflight Blackbox can be retained as archives. Archives supply no decoded measurements or automatic flight sessions. |
-| Startup | Local Node/npm launch; optional macOS background/login service and clickable controls. There is no packaged installer or general desktop-platform certification. |
+| Startup | Public source uses Node/npm, with optional macOS background/login service and clickable controls. A local Apple Silicon installer preview bundles the runtime for fresh per-user installs; existing managed installations are reused without replacement. Public signing/notarization and broader platform validation remain pending. |
 | Recovery | Complete workspace export and validated restore command while the server is stopped. Optional AI files and folder preferences are separate from the portable backup. |
+| Practice | Separate loopback server with fictional records in memory, a visible practice banner, and no AI or copied-folder access. Practice exports are samples, not personal-workspace backups. |
 | Hosting | Single workstation with a loopback server. Internet-hosted or multi-user operation is outside the current application boundary. |
 
 Read [controller interpretation](controller-map.md#interpretation-limits) and [flight-record compatibility](dji-flight-imports.md) before treating a particular export as supported. Software tests do not establish compatibility with every aircraft, receiver, firmware or log variant.
@@ -44,20 +45,9 @@ Comparison unknowns never enter confirmed change counts. A physical check cannot
 
 ## Novice usability follow-up
 
-Human novice testing has not been established by the automated checks. Try the following with a few newer pilots in a disposable workspace using synthetic data. Observe without explaining where to click; record what they expected, where they paused, and whether they completed the task.
+The [usability session kit](usability-testing.md) provides a separate practice-workspace procedure, participant tasks, observer criteria and a blank recording template. It also separates installer testing from the ordinary app tasks. Human sessions have not been established by automated checks.
 
-| Task | What to observe |
-| --- | --- |
-| Open the example and identify the motor-arm control | Can the participant find the control and distinguish a suggested assignment from a checked one? |
-| Explain the beeper, GPS recovery and arming-permission actions | Are the short descriptions understood without assuming pause/hover or treating prearm as a motor stop? |
-| Compare the original and revised examples | Can the participant explain a before/after button change and distinguish unknown evidence from no change? |
-| Import a supplied synthetic full backup | Can the participant choose an aircraft, name the backup, and return to its controller view? |
-| Start a guided control check, then leave it unfinished | Do they understand that FPVBench has no live receiver connection and that an unfinished check saves nothing? |
-| Choose a flight reference | Can they explain why an unconfirmed or later flight cannot identify the reference for this import? |
-| Download a control card and workspace backup | Can they distinguish a readable reference card from the complete recoverable data backup? |
-| Find the restore instructions | Do they understand that restore replaces the workspace, requires a stopped server, and currently uses a terminal? |
-
-Do not mark a real control checked as part of a screen-only usability exercise. Actual receiver observations need a separate physical check against the matching saved setup. Keep private logs, identifiers and optional API keys out of demonstration material.
+Start with fictional records and leave physical-check confirmations unfinished during screen-only sessions. Actual receiver observations, real aircraft checks and downloaded-installer behavior require their own evidence.
 
 ## Release status and remaining work
 
@@ -65,6 +55,6 @@ Do not mark a real control checked as part of a screen-only usability exercise. 
 - The owner selected MIT on October 25, 2026. The root license and package metadata use MIT; third-party notices remain separate.
 - Hosted Node 22/24 and synthetic browser checks passed for the beginner implementation. Keep checks green on the intended public release commit and review any later changes.
 - Confirm the documented installation path and compatibility claims with representative users and devices; record limitations rather than implying universal support.
-- This alpha is distributed as source. Packaged installers and broader device compatibility need their own validation and dependency notices.
+- Public distribution remains source-only. The local installer preview still needs Developer ID signing, Apple notarization, downloaded-package checks and reviewed bundled-component notices before public binary distribution. Intel Mac and Windows installer support remain future work.
 
 Passing software checks does not establish flight readiness or replace physical controller checks and novice usability testing.

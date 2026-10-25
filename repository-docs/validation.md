@@ -192,3 +192,14 @@ Manual upload status is separate from historical provider receipts. AirData inte
 - Actionlint passed for the prepared Node 22/24 CI workflow. Hosted results must be established on the pushed commit; local results alone do not establish hosted CI.
 - Secret and privacy checks were performed separately; their detailed findings remain private. No public release or license adoption is implied by software validation.
 - The documented novice usability task script remains a human follow-up. No human usability sessions were conducted as part of automated validation.
+
+## Practice testing and native installer preview · October 25, 2026
+
+- Version 0.8.0-alpha.2: ESLint and all 282 Jest tests in 30 suites passed. Installer tests cover bounded manifest/tree validation, unsafe path/symlink rejection, changed hashes, occupied port refusal, managed-install reuse, both required lifecycle injections for custom homes, and stopping only a newly owned failed service.
+- Practice tests prove synthetic memory-only records, ignored personal data-directory environment, unavailable credentials/providers/folder/log intake, practice-labelled export, instance reset and deterministic cleanup. Automated tests open no databases.
+- Packaging input tests use mocked fetch responses and disposable files to check trusted origins, SHA256 failures, size bounds, cache reuse and pinned Cargo registry records; they make no provider requests.
+- The full desktop/mobile Chrome journey passed, including the new practice workflow in a separate browser context. Its external-request guard is scoped to the practice origin. Keyboard focus and shorter desktop sidebar export reachability were checked.
+- The Apple Silicon installer app and ZIP were built with official Node v24.22.1, verified runtime/checksums, 147 decoder Cargo registry notice entries and no unresolved notice inputs. The MPL-2.0 inventory component includes its verified unmodified source archive. Native Cocoa compilation and local ad-hoc signature validation passed; this is not a Developer-ID-signed/notarized public release.
+- The compiled native --verify-payload check recognized an existing managed installation without mutation. API workspace state matched before and after this check.
+- Separate disposable operational verification passed 354 payload files, bundled runtime execution, decoder import and corresponding-source checksum verification. Both OS lifecycle operations were injected: no actual service was registered, personal workspace opened or database created.
+- Native dialog/Cancel verification was blocked by a locked Mac. Human novice sessions, a real fresh-user install, and browser-downloaded Gatekeeper validation remain unperformed. The usability guide and blank observations template are preparation, not human-study results.

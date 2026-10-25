@@ -200,3 +200,11 @@ The full journey passed with local Chrome 156.0.8078.47 at desktop and 390px mob
 | Recovery entry | Complete export link and stopped-server restore instructions are available from Start here and Backup and recovery. No restore runs from the browser. |
 
 Screenshots used for visual inspection are disposable local artifacts and are not part of the source distribution. These checks do not substitute for receiver measurements, actual aircraft checks or novice user research.
+
+## Isolated practice session · October 25, 2026
+
+The full Chrome 156.0.8078.47 journey passed at desktop and 390px mobile sizes with the normal and practice servers in separate browser contexts. The practice context permits only its own loopback origin. No database was opened.
+
+Verified the persistent practice notice, fictional controls, four readable example changes, explicit confirmed-flight reference, unfinished-check cancellation, software-version unknown guidance, unavailable credential fields, practice-labelled backup download, keyboard focus and mobile reflow. A shorter 1440×700 desktop window also verifies that sidebar export remains reachable through scrolling.
+
+Existing journeys retained seven fake AI calls and zero AirData requests; practice made no external requests. This is automated interface coverage, not observed novice-user evidence. Native installer dialog testing remained blocked by a locked desktop; compiled native read-only checks are reported separately.

@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "node": {
+    "version": "v24.22.1",
+    "filename": "node-v24.22.1-darwin-arm64.tar.gz",
+    "url": "https://nodejs.org/download/release/v24.22.1/node-v24.22.1-darwin-arm64.tar.gz",
+    "sha256": "89c682593d76cd44233fa53b1563264e7de9cbb189cad169135c5b4fadfbc0a7"
+  },
+  "decoder": {
+    "version": "0.5.7",
+    "commit": "e2e0775670a8391b4f7ecc40fca4cb01ea4a90fa",
+    "cargoLockURL": "https://raw.githubusercontent.com/lvauvillier/dji-log-parser/e2e0775670a8391b4f7ecc40fca4cb01ea4a90fa/Cargo.lock",
+    "cargoLockSha256": "0fe344d1de7e8ce1e824ce3c7ca5fd6c8b43454c34075392d418ccc2f084e527"
+  },
+  "supplementalNotices": [
+    {
+      "crates": [
+        "binrw-0.13.3",
+        "binrw_derive-0.13.3"
+      ],
+      "url": "https://raw.githubusercontent.com/jam1garner/binrw/5200cc100ed4c0efe63a07f0b26454e431e2de33/LICENSE",
+      "sha256": "08159509fe99d146416fe110053a7360ddfccbba5f0c8f955bdbda025d4d2a20",
+      "sourcePath": "LICENSE"
+    },
+    {
+      "crates": [
+        "geo-types-0.7.13"
+      ],
+      "url": "https://raw.githubusercontent.com/georust/geo/d0537caf204ec9b62818e43d5e1e1b704654bbcf/LICENSE-MIT",
+      "sha256": "2f8267b247fd81e9555a2e196e119a5b341bcae21011cd93985c312f1312f727",
+      "sourcePath": "LICENSE-MIT"
+    },
+    {
+      "crates": [
+        "geo-types-0.7.13"
+      ],
+      "url": "https://raw.githubusercontent.com/georust/geo/d0537caf204ec9b62818e43d5e1e1b704654bbcf/LICENSE-APACHE",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+      "sourcePath": "LICENSE-APACHE"
+    },
+    {
+      "crates": [
+        "gloo-utils-0.2.0"
+      ],
+      "url": "https://raw.githubusercontent.com/rustwasm/gloo/f3bb1d1a1c33dbcccaf26446aca7d0cea8e9d574/LICENSE-MIT",
+      "sha256": "5a6f5443ea473f130adbdcf84254761d1292bc79759b5253915d4b5e7afbef66",
+      "sourcePath": "LICENSE-MIT"
+    },
+    {
+      "crates": [
+        "gloo-utils-0.2.0"
+      ],
+      "url": "https://raw.githubusercontent.com/rustwasm/gloo/f3bb1d1a1c33dbcccaf26446aca7d0cea8e9d574/LICENSE-APACHE",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+      "sourcePath": "LICENSE-APACHE"
+    },
+    {
+      "crates": [
+        "tsify-next-macros-0.5.3"
+      ],
+      "url": "https://raw.githubusercontent.com/siefkenj/tsify/110d3d135d4872c0266599729513fc9fba4270f7/LICENSE_MIT",
+      "sha256": "23b988ff99c59aba4e37e7709d3d2102096203bb83a077cbc1aad04dd7a77244",
+      "sourcePath": "LICENSE_MIT"
+    },
+    {
+      "crates": [
+        "tsify-next-macros-0.5.3"
+      ],
+      "url": "https://raw.githubusercontent.com/siefkenj/tsify/110d3d135d4872c0266599729513fc9fba4270f7/LICENSE_APACHE",
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+      "sourcePath": "LICENSE_APACHE"
+    }
+  ],
+  "embeddedNoticeHeaders": {
+    "kamadak-exif-0.5.5": "src/lib.rs",
+    "mutate_once-0.1.1": "src/lib.rs"
+  }
+}

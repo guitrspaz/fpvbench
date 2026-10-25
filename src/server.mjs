@@ -98,7 +98,11 @@ export async function createServer({
   aiFactory,
   assistantFactory,
   filingFactory = createFilingService,
+  workspaceMode = "personal",
 } = {}) {
+  if (!["personal", "practice"].includes(workspaceMode)) throw new AppError("Unknown workspace mode.");
+  if (workspaceMode === "practice" && (storeFactory === createStore || !aiFactory || filingFactory === createFilingService))
+    throw new AppError("Practice mode requires isolated storage and disabled external services.");
   const store = await storeFactory(dataDir);
   let ai, assistant;
   try {
@@ -169,6 +173,8 @@ export async function createServer({
         throw new AppError("Unsafe request path.", 403);
       const url = new URL(req.url, `http://${req.headers.host}`),
         path = url.pathname;
+      if (workspaceMode === "practice" && (path.startsWith("/api/filing/") || (path.startsWith("/api/ai/") && !(path === "/api/ai/settings" && req.method === "GET"))))
+        throw new AppError("External services and folder access are disabled in the practice workspace.", 409);
       const match = path.match(
         /^\/api\/(aircraft|snapshots|sessions|flight-logs)\/([^/]+)(\/(?:raw|frames))?$/,
       );
@@ -242,13 +248,13 @@ export async function createServer({
         throw new AppError("API route was not found.", 404);
       }
       if (req.method === "GET" && path === "/api/health")
-        return json(res, 200, { application: "FPVBench", version: applicationVersion });
+        return json(res, 200, { application: "FPVBench", version: applicationVersion, ...(workspaceMode === "practice" ? { workspaceMode } : {}) });
       if (req.method === "GET" && path === "/api/state")
-        return json(res, 200, store.getState());
+        return json(res, 200, { ...store.getState(), ...(workspaceMode === "practice" ? { workspaceMode, storage: "memory" } : {}) });
       if (req.method === "GET" && path === "/api/export")
         return attachment(
           res,
-          "fpvbench-workspace.json",
+          workspaceMode === "practice" ? "fpvbench-practice-workspace.json" : "fpvbench-workspace.json",
           JSON.stringify(await store.exportWorkspace(), null, 2) + "\n",
           "application/json; charset=utf-8",
         );

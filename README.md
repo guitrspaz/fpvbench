@@ -104,9 +104,27 @@ Installation creates **FPVBench.app** and **FPVBench Controls** in your home **A
 
 AI can be configured later in Settings. The controller guide, comparisons, journal, demo, and backups work without it.
 
+### Native Mac installer preview
+
+A native **Install FPVBench.app** preview bundles Node.js and the application for Apple Silicon Macs. Its end-user flow requires no Git, npm, or terminal commands. This is a local review build; a signed, notarized public download is not available yet. See [Mac installation](repository-docs/macos-startup.md#native-apple-silicon-installer-preview) and the [maintainer build guide](packaging/README.md).
+
+The first preview supports fresh per-user installation. If a managed FPVBench installation already exists, it opens that installation without replacing it. Unknown conflicting files stop installation. Windows packaging and an installer-based update flow remain future work.
+
+### Try a separate practice workspace
+
+From the source checkout, run:
+
+```sh
+npm run practice
+```
+
+Use the separate loopback URL printed in the terminal and check for the **Practice workspace** banner. Fictional aircraft, setups and sessions live in memory and reset when the practice server stops. It does not open your personal workspace, AI keys or copied-record folder settings. Stop it with Ctrl+C.
+
+The [novice usability kit](repository-docs/usability-testing.md) provides tasks, scoring and a blank observation template. Human sessions have not been established by automated checks.
+
 ## Guides and development
 
-[All documentation](repository-docs/README.md) · [Alpha scope and compatibility](repository-docs/public-alpha.md) · [Betaflight imports](repository-docs/betaflight-imports.md) · [Flight log imports](repository-docs/dji-flight-imports.md) · [Manual upload tracking](repository-docs/airdata.md) · [Optional AI](repository-docs/optional-ai.md) · [Backups](repository-docs/storage-and-backups.md) · [Architecture](repository-docs/architecture.md)
+[All documentation](repository-docs/README.md) · [Usability testing](repository-docs/usability-testing.md) · [Alpha scope and compatibility](repository-docs/public-alpha.md) · [Betaflight imports](repository-docs/betaflight-imports.md) · [Flight log imports](repository-docs/dji-flight-imports.md) · [Manual upload tracking](repository-docs/airdata.md) · [Optional AI](repository-docs/optional-ai.md) · [Backups](repository-docs/storage-and-backups.md) · [Architecture](repository-docs/architecture.md)
 
 ```sh
 npm run check
@@ -118,7 +136,7 @@ Automated checks use synthetic data and injected memory repositories. Separate d
 
 ## Project status
 
-FPVBench is an early-stage, single-workstation application available as a source-only alpha. There is no packaged installer yet; installation requires Node.js, npm, and a repository checkout.
+FPVBench is an early-stage, single-workstation application. Public distribution remains a source-only alpha requiring Node.js, npm and a repository checkout. A local Apple Silicon installer preview bundles its runtime, but Developer ID signing, notarization and downloaded-package validation are still needed before a smooth public installer release.
 
 The physical button guide currently covers **DJI FPV Remote Controller 3** and selected **Betaflight 4.5.x** mode assignments. Complete behavior comparisons require matching firmware and board metadata. Other saved setups can retain their history without a fully interpreted controller map. DJI decoding also has format-specific limits. [Compatibility and the proposed first alpha →](repository-docs/public-alpha.md)
 

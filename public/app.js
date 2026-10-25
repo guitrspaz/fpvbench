@@ -117,6 +117,13 @@ function notify(message, error = false) {
 
 async function refresh() {
   [state] = await Promise.all([api("/api/state"), readAiSettings()]);
+  const practice = state.workspaceMode === "practice";
+  $("#practice-banner").hidden = !practice;
+  $(".local-badge").textContent = practice ? "PRACTICE · RESETS ON STOP" : "LOCAL WORKSPACE";
+  document.body.dataset.workspace = practice ? "practice" : "personal";
+  if (practice) {
+    $(".sidebar-note").replaceChildren(element("strong", { text: "Practice workspace" }), element("p", { text: "Fictional records in memory. Real files and external services are separate." }));
+  }
   const visible = visibleAircraft();
   if (!visible.some(aircraft => aircraft.id === aircraftId)) aircraftId = visible[0]?.id || "";
   $("#fleet-status-filter").value = fleetStatus;
@@ -130,7 +137,7 @@ async function refresh() {
   selector.value = aircraftId;
   $("#import-snapshot").disabled = !aircraftId;
   $("#new-session").disabled = !aircraftId;
-  $("#import-flights").disabled = false;
+  $("#import-flights").disabled = practice;
   $("#edit-aircraft").disabled = !aircraftId;
   await render();
 }
@@ -1102,6 +1109,10 @@ function showSettings() {
     notify("Display units saved.");
   });
   display.append(element("label", {}, "Display units", unitSelect), element("p", { class: "form-help", text: "Saved for this browser. Stored measurements remain unchanged. Changing units makes no AI call." }));
+  if (state.workspaceMode === "practice") {
+    content.replaceChildren(display, element("section", {class:"panel"}, panelHeading("Practice settings", "Optional AI and external connections are disabled. No API key is needed for these tasks.")));
+    return;
+  }
   const panel = element("section", { class: "panel settings-panel" }, panelHeading("OpenAI API (ChatGPT models)",
     "This API-key integration uses separate OpenAI API billing."));
   const form = element("form", { id: "ai-settings-form" });
@@ -1439,6 +1450,10 @@ function filingEntryPanel() {
 }
 
 async function showFiling(revision) {
+  if (state.workspaceMode === "practice") {
+    content.replaceChildren(element("section",{class:"panel"},panelHeading("Folder access is disabled in practice","Use the supplied setup examples. This practice session does not open your flight-record folders.")));
+    return;
+  }
   content.replaceChildren(element("p",{class:"loading",text:"Loading folder review…"}));
   try {
     const [settings,initial]=await Promise.all([api("/api/filing/settings"),api("/api/filing/scan")]);
@@ -1788,6 +1803,7 @@ async function showFlightDetail(id, revision) {
 }
 
 function openFlightImport() {
+  if (state.workspaceMode === "practice") { notify("Flight-record imports are disabled in practice. Use the supplied setup examples."); return; }
   $("#flight-import-form").reset();
   const select = $("#flight-import-form").elements.aircraftId;
   select.replaceChildren(element("option", { value: "", text: "Automatically match aircraft serials" }),

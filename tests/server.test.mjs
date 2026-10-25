@@ -245,3 +245,8 @@ test('Controller 3 endpoints validate observations, isolate setups, and compare 
   expect((await(await request('/api/snapshots/'+a.id+'/controller')).json()).revision).toBe(0);
   const backup=await(await request('/api/export')).json();expect(backup.snapshots.find(s=>s.id===b.id).controller.revision).toBe(1);
 });
+
+test('practice mode refuses ordinary storage before opening any workspace', async () => {
+  await expect(createServer({ workspaceMode: 'practice' })).rejects.toThrow(/isolated storage/);
+  await expect(createServer({ workspaceMode: 'unknown' })).rejects.toThrow(/Unknown workspace mode/);
+});

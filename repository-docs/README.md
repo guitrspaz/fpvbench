@@ -1,8 +1,10 @@
 # FPVBench documentation
 
 - [Project quickstart](../README.md): start/stop the app and follow the first workflow.
-- [Public-alpha preparation and compatibility](public-alpha.md): beginner starting path, supported interpretation, pending release decisions, and human usability tasks.
-- [macOS startup](macos-startup.md): login service, clickable controls, updates, and removal.
+- [Alpha scope and compatibility](public-alpha.md): beginner starting path, supported interpretation, installer boundaries and remaining work.
+- [macOS startup](macos-startup.md): native installer preview, source installation, login service, clickable controls, updates and removal.
+- [Usability testing](usability-testing.md): isolated practice workspace, participant tasks, installer checks, scoring and observation template.
+- [Installer build guide](../packaging/README.md): maintainer packaging, runtime provenance, component notices and signing boundary.
 - [Controller 3 map](controller-map.md): guided physical checks, reference shortcuts, offline cards, and behavior comparisons.
 - [Betaflight imports](betaflight-imports.md): prepare exports and interpret their limits.
 - [Flight log imports](dji-flight-imports.md): DJI decoding, broader original archives, assignment, and format limits.
@@ -16,6 +18,7 @@
 - [Architecture](architecture.md): modules, persistence, comparison semantics, and boundaries.
 - [v0.2 scope](scope-v0.2.md): SQLite/import objects, API, evidence plan, and deferred work.
 - [Historical v0.1 scope](scope-v0.1.md): original setup-history feature scope.
+- [Mac installer and testing scope](scope-macos-installer-testing.md): approved preview and practice-workspace boundaries, test plan and documentation ownership.
 - [Beginner-alpha scope](scope-beginner-alpha.md): approved workflow, evidence boundaries, and test/documentation plan.
 - [Validation](validation.md): reproducible checks and actual evidence.
 - [Browser validation](browser-validation.md): browser journey and responsive checks.

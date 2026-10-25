@@ -4,7 +4,7 @@
 
 ## Local application
 
-FPVBench v0.7 is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI requests use server-side fetch. AirData integration is deferred; the server never constructs its service.
+FPVBench is a single-workstation application. A Node.js HTTP server binds to loopback and serves local HTML, CSS, and browser ES modules. No build step, remote assets, account, or cloud service is required. Runtime dependencies are Node built-ins and the pinned DJI decoder's embedded WebAssembly. Optional OpenAI requests use server-side fetch. AirData integration is deferred; the server never constructs its service.
 
 The interface calls JSON endpoints for aircraft, setup imports/comparison, sessions, and flight-log records. Browser local storage remembers aircraft/fleet selection, display units and the optional manual-upload-tracking preference; the server owns the data.
 
@@ -20,6 +20,7 @@ The interface calls JSON endpoints for aircraft, setup imports/comparison, sessi
 | `src/workspace-lock.mjs` | Own/recover the data-directory lock. |
 | `src/restore.mjs` | Validate complete backups, stage a database, and preserve the previous workspace. |
 | `src/sqlite-repository.mjs` | Prepared SQLite persistence and telemetry pagination. |
+| `src/memory-repository.mjs` | Clone isolated catalog/frame data in memory for the practice server without opening SQLite. |
 | `src/log-import.mjs` | Recognize content and retain broader originals without inventing flight evidence. |
 | `src/import-filing.mjs` | Scan local source folders, classify exact originals against the catalog, and recheck selected files before import. |
 | `src/airdata.mjs` | Dormant upload implementation retained for future reassessment; never initialized by the application server. |
@@ -29,6 +30,9 @@ The interface calls JSON endpoints for aircraft, setup imports/comparison, sessi
 | `src/ai-service.mjs` | Gate optional OpenAI requests, reserve local allowance, validate output, and cache reports. |
 | `src/ai-private-files.mjs` | Read/write owner-private credentials and AI state without following symlinks. |
 | `src/macos-service.mjs` | Generate and manage per-user macOS launch artifacts, clickable controls, readiness and verified manual-server handoff. |
+| `src/macos-installer.mjs` | Validate the bundled installer payload, inspect existing installation ownership and stage a fresh per-user install. |
+| `src/practice-workspace.mjs` | Start and clean up an isolated, memory-backed practice server with disabled external integrations. |
+| `src/practice-data.mjs` | Seed fictional aircraft, supported setup evidence and explicit example flight sessions. |
 | `src/assistant.mjs` | Assemble actual setup/baseline context, cache explanations, and provide flight recaps. |
 | `src/assistant-evidence.mjs` | Filter explicit tuning fields and calculate aggregate flight facts. |
 | `src/assistant-glossary.mjs` | Supply fixed source-attributed Betaflight guidance. |
@@ -138,3 +142,18 @@ Named reference shortcuts operate on the selected aircraft's existing history an
 The control-card builder creates a standalone escaped HTML document in the browser and downloads it through an object URL. Its mobile and print styles require no remote assets. It contains setup identity, visible actions, per-control confidence and recorded positions; it excludes source files, flight locations, serials and hidden notes. It has no script or live connection back to the workspace.
 
 Start here renders a separate synthetic comparison locally through the same controller renderer without save callbacks. The demo makes no catalog mutations or hardware requests. Recovery guidance links the existing complete export and explains the stopped-server restore command; it introduces no browser restore endpoint. No schema or data migration is needed for these presentation changes. See [beginner-alpha scope](scope-beginner-alpha.md) and [public-alpha guide](public-alpha.md).
+
+
+## Isolated practice workspace
+
+The practice entry point creates a disposable local directory and injects a memory repository into the normal store/server path. It seeds fictional records rather than reading the ordinary workspace. Practice mode is explicit in state/readiness metadata and the interface keeps a practice banner visible across views. Practice exports use a distinct filename.
+
+AI mutation/provider paths and copied-folder settings are unavailable in practice. No personal key/configuration or folder preference is loaded, and no database is opened. Edits remain in memory; stopping the practice server closes resources and removes the temporary directory. Closing a browser tab alone does not stop the server. The ordinary server still defaults to the persistent personal workspace. See [the session kit](usability-testing.md).
+
+## Native installer preview
+
+The Apple Silicon preview wraps a validated payload in a native Cocoa installer app. It bundles an official pinned Node runtime, allowlisted runtime source/static files, the production decoder package and component notices. Build inputs exclude Git metadata, personal data/configuration, tests and development dependencies. Maintainer build and provenance details live in [packaging](../packaging/README.md).
+
+The installer verifies bounded manifest entries and file hashes, rejects symlinks and unexpected paths, and inspects conflicts before copying. A fresh install stages a versioned owner-private payload under Application Support and invokes the existing macOS service installer with the bundled runtime through argument arrays, without shell interpolation. A recognized managed installation is reused without reactivation or replacement. Unknown conflicting launcher/support/workspace files are refused.
+
+This preview does not implement packaged upgrades, forced service takeover or workspace repair. Activation failure retains installer-owned recovery information. Local ad-hoc signing is for preview verification; Developer ID signing, notarization and downloaded-package validation are separate distribution requirements. No public binary publication is implied by a successful local build.
