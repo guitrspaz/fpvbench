@@ -62,8 +62,8 @@ Do not mark a real control checked as part of a screen-only usability exercise. 
 ## Release decisions still pending
 
 - Review the private scan results and Git author/committer metadata before exposing existing history. Reachable-history and integrated-source scans found no secrets in the material checked; automated scans cannot establish the absence of all private information.
-- Select and adopt the project license after reviewing dependency obligations. The package is currently `UNLICENSED`; a prepared license recommendation is not an adopted license.
-- Establish successful hosted CI on the intended release commit and review any final changes after the local software checks.
+- The owner selected MIT on October 25, 2026. The root license and package metadata use MIT; third-party notices remain separate.
+- Hosted Node 22/24 and synthetic browser checks passed for the beginner implementation. Keep checks green on the intended public release commit and review any later changes.
 - Confirm the documented installation path and compatibility claims with representative users and devices; record limitations rather than implying universal support.
 - Approve the concrete public repository/release content and destination before changing visibility or publishing an announcement.
 

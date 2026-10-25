@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "A local workbench for FPV setup history and flight-session records.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "engines": {
     "node": ">=22.13.0"
   },

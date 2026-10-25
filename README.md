@@ -118,8 +118,12 @@ Automated checks use synthetic data and injected memory repositories. Separate d
 
 ## Project status
 
-FPVBench is an early-stage, single-workstation application being prepared for a public alpha. The repository remains private and a public release and project license are pending. There is no packaged installer yet; installation requires Node.js, npm, and a repository checkout.
+FPVBench is an early-stage, single-workstation application being prepared for a public alpha. The repository remains private and a public release is pending. There is no packaged installer yet; installation requires Node.js, npm, and a repository checkout.
 
 The physical button guide currently covers **DJI FPV Remote Controller 3** and selected **Betaflight 4.5.x** mode assignments. Complete behavior comparisons require matching firmware and board metadata. Other saved setups can retain their history without a fully interpreted controller map. DJI decoding also has format-specific limits. [Compatibility and the proposed first alpha →](repository-docs/public-alpha.md)
 
 Direct controller capture/deployment, encrypted-telemetry keychain support, Blackbox analysis, media uploads, and cloud hosting are future work.
+
+## License
+
+FPVBench is licensed under the [MIT License](LICENSE). Third-party components retain their own [license notices](THIRD_PARTY_NOTICES.md).
