@@ -1,8 +1,8 @@
-# Public-alpha preparation and compatibility
+# Alpha scope and compatibility
 
 **Last Updated:** October 25, 2026
 
-FPVBench is being prepared for a small public alpha centered on understanding saved FPV controls and remembering setups. The repository remains private. This guide describes the current starting path, supported evidence, and decisions still needed before publication.
+FPVBench is a source-only alpha centered on understanding saved FPV controls and remembering setups. This guide describes the current starting path, supported evidence, and work still needed before broader use.
 
 ## Start with one aircraft
 
@@ -42,7 +42,7 @@ A backup describes settings saved at a point in time. A suggested physical mappi
 
 Comparison unknowns never enter confirmed change counts. A physical check cannot make different firmware versions comparable, recover an omitted historical setting, or establish live aircraft state. [Controller workflow and next steps →](controller-map.md)
 
-## Human usability check before the alpha
+## Novice usability follow-up
 
 Human novice testing has not been established by the automated checks. Try the following with a few newer pilots in a disposable workspace using synthetic data. Observe without explaining where to click; record what they expected, where they paused, and whether they completed the task.
 
@@ -59,12 +59,12 @@ Human novice testing has not been established by the automated checks. Try the f
 
 Do not mark a real control checked as part of a screen-only usability exercise. Actual receiver observations need a separate physical check against the matching saved setup. Keep private logs, identifiers and optional API keys out of demonstration material.
 
-## Release decisions still pending
+## Release status and remaining work
 
-- Review the private scan results and Git author/committer metadata before exposing existing history. Reachable-history and integrated-source scans found no secrets in the material checked; automated scans cannot establish the absence of all private information.
+- Reachable-history and source scans found no secrets in the material checked; automated scans cannot establish the absence of all private information. Examples and automated checks use synthetic records.
 - The owner selected MIT on October 25, 2026. The root license and package metadata use MIT; third-party notices remain separate.
 - Hosted Node 22/24 and synthetic browser checks passed for the beginner implementation. Keep checks green on the intended public release commit and review any later changes.
 - Confirm the documented installation path and compatibility claims with representative users and devices; record limitations rather than implying universal support.
-- Approve the concrete public repository/release content and destination before changing visibility or publishing an announcement.
+- This alpha is distributed as source. Packaged installers and broader device compatibility need their own validation and dependency notices.
 
-The private release-review record is separate from this guide. This document does not certify public-release readiness or authorize publication.
+Passing software checks does not establish flight readiness or replace physical controller checks and novice usability testing.
