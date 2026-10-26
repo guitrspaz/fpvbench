@@ -39,3 +39,5 @@ The preview requires macOS 14 or newer. After building, run the compiled helper 
     node dev/verify-macos-installer.mjs "/absolute/output/Install FPVBench.app/Contents/Resources/payload"
 
 This proof copies the real payload to a disposable synthetic home and runs its bundled Node/decoder. Both service lifecycle operations are injected; no real service is registered and no database is opened. It does not replace native dialog testing, a fresh-user installation test, or Gatekeeper validation.
+
+Build in a local, non-synced folder such as /private/tmp, then copy the finished ZIP to the desired sharing folder. Some synced output folders attach Finder metadata that codesign rejects. Preserve quarantine attributes; this build-location workaround is not a Gatekeeper bypass.
